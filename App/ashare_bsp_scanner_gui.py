@@ -1,19 +1,21 @@
 """
-A股缠论买点扫描器 - Powered by chan.py
+ChanScanner - 缠论图表分析工具 - Powered by chan.py
 
 功能说明:
-    - 批量扫描A股市场，自动识别近期出现买点的股票
-    - 支持单只股票的缠论分析和图表展示
+    - 导入通达信导出的本地TXT K线数据（日线/分钟/秒级，支持跨月跨年日期推断）
+    - 联网分析单只A股（腾讯分钟线 / baostock 日线）
     - 可视化显示K线、笔、线段、中枢、买卖点、MACD等
+    - 图表交互: 滚轮缩放、拖拽平移、右键框选、双击恢复视图、十字光标
+    - 导出通达信线段公式文件(.tni)
 
 数据来源:
     - 分钟级别(1/5/15/30/60分钟): 使用腾讯财经接口 (ifzq.gtimg.cn)
       注意: 分钟数据最多获取最近约320根(约1.3个交易日)
     - 日线级别: 使用 baostock 获取A股历史K线数据
+    - 本地数据: 通达信导出的TXT文件
 
-过滤规则:
-    - 剔除ST股票、科创板(688)、北交所、B股
-    - 剔除停牌股票和新股
+笔划分规则:
+    - 固定使用新笔（bi_strict=False，非严格模式），不提供新旧笔切换
 
 依赖:
     - PyQt6: GUI框架
@@ -48,8 +50,7 @@ from datetime import datetime, timedelta
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QGroupBox,
-    QMessageBox, QStatusBar, QSplitter, QTableWidget, QTableWidgetItem,
-    QProgressBar, QHeaderView, QTextEdit, QFileDialog, QInputDialog
+    QMessageBox, QStatusBar, QSplitter, QFileDialog, QInputDialog
 )
 from PyQt6.QtCore import QDate, Qt, QThread, pyqtSignal
 
@@ -57,8 +58,6 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
-
-import pandas as pd
 
 from Chan import CChan
 from ChanConfig import CChanConfig
@@ -86,189 +85,6 @@ def to_baostock_code(code):
     if code.startswith('6'):
         return f"sh.{code}"
     return f"sz.{code}"
-
-
-def get_tradable_stocks():
-    """
-    获取所有可交易的A股股票列表（使用 baostock 数据源）
-
-    过滤条件:
-        1. 剔除指数（type != '1'）
-        2. 剔除ST股票（名称包含ST）
-        3. 剔除科创板（688开头）
-        4. 剔除北交所（8开头、43开头）
-        5. 剔除B股（200开头深圳B股、900开头上海B股）
-        6. 剔除存托凭证CDR（920开头）
-
-    Returns:
-        pd.DataFrame: 包含 ['代码', '名称', '最新价', '涨跌幅'] 列的股票列表
-                      获取失败时返回空 DataFrame
-    """
-    try:
-        import baostock as bs
-        bs.login()
-        rs = bs.query_stock_basic()
-        rows = []
-        while (rs.error_code == '0') and rs.next():
-            rows.append(rs.get_row_data())
-        bs.logout()
-
-        if not rows:
-            return pd.DataFrame()
-
-        # 字段: ['code', 'code_name', 'ipoDate', 'outDate', 'type', 'status']
-        df = pd.DataFrame(rows, columns=['bs_code', '名称', 'ipoDate', 'outDate', 'type', 'status'])
-
-        # 1. 只保留股票（type='1'），剔除指数（type='2'）
-        df = df[df['type'] == '1']
-
-        # 提取纯数字代码
-        df['代码'] = df['bs_code'].str.split('.').str[1]
-
-        # 2. 剔除ST股票（名称包含ST）
-        df = df[~df['名称'].str.contains('ST', case=False, na=False)]
-
-        # 3. 剔除科创板（688开头）
-        df = df[~df['代码'].str.startswith('688')]
-
-        # 4. 剔除北交所（8开头，以43、83、87开头的也是北交所）
-        df = df[~df['代码'].str.startswith('8')]
-        df = df[~df['代码'].str.startswith('43')]
-
-        # 5. 剔除B股（200开头深圳B股，900开头上海B股）
-        df = df[~df['代码'].str.startswith('200')]
-        df = df[~df['代码'].str.startswith('900')]
-
-        # 6. 剔除存托凭证CDR（920开头）
-        df = df[~df['代码'].str.startswith('920')]
-
-        # baostock 无实时行情，最新价/涨跌幅设为 0
-        df['最新价'] = 0.0
-        df['涨跌幅'] = 0.0
-
-        return df[['代码', '名称', '最新价', '涨跌幅']].reset_index(drop=True)
-    except Exception as e:
-        print(f"获取股票列表失败: {e}")
-        return pd.DataFrame()
-
-
-class ScanThread(QThread):
-    """
-    批量扫描股票的后台线程
-
-    在独立线程中遍历股票列表，对每只股票进行缠论分析，
-    检测最近3天内是否出现买点。
-
-    Signals:
-        progress: (int, int, str) 当前进度、总数、当前股票信息
-        found_signal: (dict) 发现买点时发出，包含股票详情和 CChan 对象
-        finished: (int, int) 扫描完成，返回成功数和失败数
-        log_signal: (str) 日志消息
-    """
-    progress = pyqtSignal(int, int, str)
-    found_signal = pyqtSignal(dict)
-    finished = pyqtSignal(int, int)
-    log_signal = pyqtSignal(str)
-
-    def __init__(self, stock_list, config, days=365):
-        """
-        初始化扫描线程
-
-        Args:
-            stock_list: pd.DataFrame, 待扫描的股票列表
-            config: CChanConfig, 缠论配置
-            days: int, 获取多少天的历史数据，默认365天
-        """
-        super().__init__()
-        self.stock_list = stock_list
-        self.config = config
-        self.days = days
-        self.is_running = True
-
-    def stop(self):
-        """停止扫描，设置标志位让 run() 循环退出"""
-        self.is_running = False
-
-    def run(self):
-        """
-        线程主函数，遍历股票列表进行缠论分析
-
-        扫描逻辑:
-            1. 跳过无K线数据的股票
-            2. 跳过停牌超过15天的股票
-            3. 检测最近3天内是否出现买点
-            4. 发现买点时通过 found_signal 发出通知
-        """
-        begin_time = (datetime.now() - timedelta(days=self.days)).strftime("%Y-%m-%d")
-        end_time = datetime.now().strftime("%Y-%m-%d")
-        total = len(self.stock_list)
-        success_count = 0
-        fail_count = 0
-
-        for idx, row in self.stock_list.iterrows():
-            if not self.is_running:
-                break
-
-            code = row['代码']
-            name = row['名称']
-            self.progress.emit(idx + 1, total, f"{code} {name}")
-            self.log_signal.emit(f"🔍 扫描 {code} {name}...")
-
-            try:
-                chan = CChan(
-                    code=to_baostock_code(code),
-                    begin_time=begin_time,
-                    end_time=end_time,
-                    data_src=DATA_SRC.BAO_STOCK,
-                    lv_list=[KL_TYPE.K_DAY],
-                    config=self.config,
-                    autype=AUTYPE.QFQ,
-                )
-
-                # 检查最近15天是否有数据
-                if len(chan[0]) == 0:
-                    fail_count += 1
-                    self.log_signal.emit(f"⏭️ {code} {name}: 无K线数据")
-                    continue
-                last_klu = chan[0][-1][-1]
-                last_time = last_klu.time
-                last_date = datetime(last_time.year, last_time.month, last_time.day)
-                if (datetime.now() - last_date).days > 15:
-                    fail_count += 1
-                    self.log_signal.emit(f"⏸️ {code} {name}: 停牌超过15天")
-                    continue
-
-                success_count += 1
-
-                # 检查是否有买点（只找最近3天内出现的买点）
-                bsp_list = chan.get_latest_bsp(number=0)
-                cutoff_date = datetime.now() - timedelta(days=3)
-                buy_points = [
-                    bsp for bsp in bsp_list
-                    if bsp.is_buy and datetime(bsp.klu.time.year, bsp.klu.time.month, bsp.klu.time.day) >= cutoff_date
-                ]
-
-                if buy_points:
-                    # 获取最近的买点
-                    latest_buy = buy_points[0]
-                    self.log_signal.emit(f"✅ {code} {name}: 发现买点 {latest_buy.type2str()}")
-                    self.found_signal.emit({
-                        'code': code,
-                        'name': name,
-                        'price': row['最新价'],
-                        'change': row['涨跌幅'],
-                        'bsp_type': latest_buy.type2str(),
-                        'bsp_time': str(latest_buy.klu.time),
-                        'chan': chan,
-                    })
-                else:
-                    self.log_signal.emit(f"➖ {code} {name}: 无近期买点")
-            except Exception as e:
-                fail_count += 1
-                self.log_signal.emit(f"❌ {code} {name}: {str(e)[:50]}")
-                continue
-
-        self.finished.emit(success_count, fail_count)
 
 
 # 周期选项: 显示文本 -> (KL_TYPE, 数据源)
@@ -409,30 +225,29 @@ class ChanPlotCanvas(FigureCanvas):
 
 class AkshareGUI(QMainWindow):
     """
-    A股缠论买点扫描器主窗口
+    ChanScanner 缠论图表分析主窗口
 
     主要功能:
-        - 批量扫描: 自动获取所有可交易股票，逐一分析寻找买点
-        - 单股分析: 手动输入股票代码进行缠论分析
+        - 本地导入: 选择通达信导出的TXT文件进行缠论分析
+        - 单股分析: 手动输入股票代码进行在线缠论分析
         - 图表显示: 可视化展示K线、笔、线段、中枢、买卖点、MACD
+        - 公式导出: 把当前线段划分导出为通达信公式文件
 
     界面布局:
-        - 左侧面板: 扫描控制、单股输入、买点列表、扫描日志
-        - 右侧面板: 图表显示区域，支持缩放和导航
+        - 左侧面板: 股票代码/周期选择、本地TXT导入、公式导出
+        - 右侧面板: 图表显示区域，支持缩放、拖拽、框选和十字光标
     """
 
     def __init__(self):
         """初始化主窗口"""
         super().__init__()
         self.chan = None  # 当前分析的 CChan 对象
-        self.scan_thread = None  # 批量扫描线程
-        self.analysis_thread = None  # 单股分析线程
-        self.stock_cache = {}  # 缓存已分析的股票 {code: CChan}
+        self.analysis_thread = None  # 单股分析/本地导入线程
         self.init_ui()
 
     def init_ui(self):
         """初始化用户界面"""
-        self.setWindowTitle('A股缠论买点扫描器 - Powered by chan.py')
+        self.setWindowTitle('ChanScanner 缠论图表分析 - Powered by chan.py')
         self.setGeometry(100, 100, 1600, 900)
 
         # 创建中央 widget
@@ -442,7 +257,7 @@ class AkshareGUI(QMainWindow):
         # 主布局
         main_layout = QHBoxLayout(central_widget)
 
-        # 左侧控制面板和股票列表
+        # 左侧分析控制面板
         left_panel = self.create_left_panel()
 
         # 右侧图表区域
@@ -459,66 +274,12 @@ class AkshareGUI(QMainWindow):
         # 状态栏
         self.statusBar = QStatusBar()
         self.setStatusBar(self.statusBar)
-        self.statusBar.showMessage('就绪 - 点击"开始扫描"分析所有股票')
+        self.statusBar.showMessage('就绪 - 可导入本地TXT数据或输入股票代码分析')
 
     def create_left_panel(self):
         """创建左侧面板"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-
-        # 扫描控制
-        scan_group = QGroupBox("扫描设置")
-        scan_layout = QVBoxLayout(scan_group)
-
-        # 笔严格模式（默认关闭，使用缠中说禅标准新笔划分方式）
-        # 勾选 = 旧笔（严格，顶底间至少3根独立合并K线）；不勾选 = 新笔（顶底间至少1根独立合并K线，且原始K线>=5）
-        self.bi_strict_cb = QCheckBox("笔严格模式(旧笔)")
-        self.bi_strict_cb.setChecked(False)
-        scan_layout.addWidget(self.bi_strict_cb)
-
-        # 扫描按钮
-        btn_layout = QHBoxLayout()
-        self.scan_btn = QPushButton("开始扫描")
-        self.scan_btn.clicked.connect(self.start_scan)
-        self.scan_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                font-size: 14px;
-                padding: 10px;
-                border-radius: 5px;
-            }
-            QPushButton:hover { background-color: #45a049; }
-            QPushButton:disabled { background-color: #cccccc; }
-        """)
-        btn_layout.addWidget(self.scan_btn)
-
-        self.stop_btn = QPushButton("停止")
-        self.stop_btn.clicked.connect(self.stop_scan)
-        self.stop_btn.setEnabled(False)
-        self.stop_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f44336;
-                color: white;
-                font-size: 14px;
-                padding: 10px;
-                border-radius: 5px;
-            }
-            QPushButton:hover { background-color: #da190b; }
-            QPushButton:disabled { background-color: #cccccc; }
-        """)
-        btn_layout.addWidget(self.stop_btn)
-        scan_layout.addLayout(btn_layout)
-
-        # 进度条
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        scan_layout.addWidget(self.progress_bar)
-
-        self.progress_label = QLabel("")
-        scan_layout.addWidget(self.progress_label)
-
-        layout.addWidget(scan_group)
 
         # 单只股票分析
         single_group = QGroupBox("单只股票分析")
@@ -551,6 +312,12 @@ class AkshareGUI(QMainWindow):
         period_hint.setStyleSheet("color: #888888; font-size: 11px;")
         single_layout.addWidget(period_hint)
 
+        # 笔划分规则说明（固定新笔，已移除新旧笔切换）
+        rule_hint = QLabel("笔划分规则: 固定使用新笔(bi_strict=False)")
+        rule_hint.setWordWrap(True)
+        rule_hint.setStyleSheet("color: #666666; font-size: 11px;")
+        single_layout.addWidget(rule_hint)
+
         # 导入本地通达信TXT数据
         import_row = QHBoxLayout()
         self.import_btn = QPushButton("导入本地TXT数据")
@@ -568,7 +335,7 @@ class AkshareGUI(QMainWindow):
         import_row.addWidget(self.import_btn)
         single_layout.addLayout(import_row)
 
-        import_hint = QLabel("导入通达信导出的TXT文件(1分钟线)，可查看完整历史数据")
+        import_hint = QLabel("导入通达信导出的TXT文件(支持日线/分钟/秒级)，可查看完整历史数据")
         import_hint.setWordWrap(True)
         import_hint.setStyleSheet("color: #888888; font-size: 11px;")
         single_layout.addWidget(import_hint)
@@ -597,39 +364,7 @@ class AkshareGUI(QMainWindow):
 
         layout.addWidget(single_group)
 
-        # 买点股票列表
-        list_group = QGroupBox("买点股票列表")
-        list_layout = QVBoxLayout(list_group)
-
-        self.stock_table = QTableWidget()
-        self.stock_table.setColumnCount(5)
-        self.stock_table.setHorizontalHeaderLabels(['代码', '名称', '现价', '涨跌%', '买点'])
-        self.stock_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.stock_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.stock_table.cellClicked.connect(self.on_stock_clicked)
-        list_layout.addWidget(self.stock_table)
-
-        # 清空按钮
-        self.clear_list_btn = QPushButton("清空列表")
-        self.clear_list_btn.clicked.connect(self.clear_stock_list)
-        list_layout.addWidget(self.clear_list_btn)
-
-        layout.addWidget(list_group)
-
-        # 日志区域
-        log_group = QGroupBox("扫描日志")
-        log_layout = QVBoxLayout(log_group)
-
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        self.log_text.setMaximumHeight(150)
-        log_layout.addWidget(self.log_text)
-
-        clear_log_btn = QPushButton("清空日志")
-        clear_log_btn.clicked.connect(lambda: self.log_text.clear())
-        log_layout.addWidget(clear_log_btn)
-
-        layout.addWidget(log_group)
+        layout.addStretch()
 
         return panel
 
@@ -689,10 +424,10 @@ class AkshareGUI(QMainWindow):
         获取缠论分析配置
 
         Returns:
-            CChanConfig: 包含笔严格模式、买卖点类型等配置的对象
+            CChanConfig: 包含笔划分、买卖点类型等配置的对象
         """
         return CChanConfig({
-            "bi_strict": self.bi_strict_cb.isChecked(),  # 笔严格模式
+            "bi_strict": False,  # 固定新笔（非严格模式），不提供新旧笔切换
             "bi_fx_check": "half",  # 分型有效性校验方式（half 更符合缠论原文，避免 strict 过度过滤）
             "trigger_step": False,  # 不启用逐步触发模式
             "skip_step": 0,
@@ -727,93 +462,6 @@ class AkshareGUI(QMainWindow):
             "plot_bsp": False,  # 不显示笔级别买卖点
             "plot_segbsp": self.plot_bsp_cb.isChecked(),  # 显示线段级别买卖点
         }
-
-    def start_scan(self):
-        """开始批量扫描所有可交易股票"""
-        self.scan_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
-        self.stock_cache.clear()
-
-        self.statusBar.showMessage('正在获取股票列表...')
-        QApplication.processEvents()
-
-        # 获取股票列表
-        stock_list = get_tradable_stocks()
-        if stock_list.empty:
-            QMessageBox.warning(self, "警告", "获取股票列表失败")
-            self.scan_btn.setEnabled(True)
-            self.stop_btn.setEnabled(False)
-            self.progress_bar.setVisible(False)
-            return
-
-        self.statusBar.showMessage(f'获取到 {len(stock_list)} 只可交易股票，开始扫描...')
-        self.progress_bar.setMaximum(len(stock_list))
-
-        # 启动扫描线程
-        config = self.get_chan_config()
-        self.scan_thread = ScanThread(stock_list, config, days=365)
-        self.scan_thread.progress.connect(self.on_scan_progress)
-        self.scan_thread.found_signal.connect(self.on_buy_point_found)
-        self.scan_thread.finished.connect(self.on_scan_finished)
-        self.scan_thread.log_signal.connect(self.on_log_message)
-        self.scan_thread.start()
-
-    def stop_scan(self):
-        """停止扫描"""
-        if self.scan_thread:
-            self.scan_thread.stop()
-        self.statusBar.showMessage('正在停止扫描...')
-
-    def on_scan_progress(self, current, total, stock_info):
-        """扫描进度更新"""
-        self.progress_bar.setValue(current)
-        self.progress_label.setText(f"进度: {current}/{total} - {stock_info}")
-
-    def on_log_message(self, msg):
-        """显示日志消息"""
-        self.log_text.append(msg)
-
-    def on_buy_point_found(self, data):
-        """
-        发现买点的回调函数
-
-        Args:
-            data: dict, 包含股票代码、名称、价格、买点类型、CChan对象等信息
-        """
-        row = self.stock_table.rowCount()
-        self.stock_table.insertRow(row)
-        self.stock_table.setItem(row, 0, QTableWidgetItem(data['code']))
-        self.stock_table.setItem(row, 1, QTableWidgetItem(data['name']))
-        self.stock_table.setItem(row, 2, QTableWidgetItem(f"{data['price']:.2f}"))
-        self.stock_table.setItem(row, 3, QTableWidgetItem(f"{data['change']:.2f}%"))
-        self.stock_table.setItem(row, 4, QTableWidgetItem(f"{data['bsp_type']} ({data['bsp_time']})"))
-
-        # 缓存 chan 对象
-        self.stock_cache[data['code']] = data['chan']
-
-    def on_scan_finished(self, success_count, fail_count):
-        """扫描完成"""
-        self.scan_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.progress_bar.setVisible(False)
-        found_count = self.stock_table.rowCount()
-        self.statusBar.showMessage(f'扫描完成: 成功{success_count}只, 跳过{fail_count}只, 发现{found_count}只买点股票')
-        self.progress_label.setText(f"完成: 成功{success_count}, 跳过{fail_count}, 买点{found_count}")
-
-    def on_stock_clicked(self, row, col):
-        """点击股票列表"""
-        code = self.stock_table.item(row, 0).text()
-        name = self.stock_table.item(row, 1).text()
-
-        if code in self.stock_cache:
-            self.chan = self.stock_cache[code]
-            self.plot_chart()
-            self.statusBar.showMessage(f'显示: {code} {name}')
-        else:
-            # 重新分析
-            self.analyze_stock(code)
 
     def analyze_single(self):
         """分析单只股票"""
@@ -1423,12 +1071,6 @@ class AkshareGUI(QMainWindow):
     def refresh_chart(self):
         """刷新图表"""
         self.plot_chart()
-
-    def clear_stock_list(self):
-        """清空股票列表"""
-        self.stock_table.setRowCount(0)
-        self.stock_cache.clear()
-        self.statusBar.showMessage('列表已清空')
 
 
 def main():
