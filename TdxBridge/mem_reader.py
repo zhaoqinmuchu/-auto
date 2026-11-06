@@ -720,6 +720,91 @@ def write_tdx_txt(path: str, bars: list[Bar], title: str = "") -> str:
     return path
 
 
+# ---------------------------------------------------------------------------
+# 多块合并：股票/部分行情的秒级 K 线按"加载窗口"分块缓存，单块常只有 1~2 天；
+# 把同一周期、与已合并数据在重叠时段 OHLC 完全一致的其它块拼进来。
+# 重叠时段校验既验证"同一品种"，也避免把别的品种（如同时残留的其它指数）混入。
+# ---------------------------------------------------------------------------
+
+MERGE_TOL = 0.02  # 价格容差（分）
+MERGE_MIN_OVERLAP = 20  # 至少 20 根重叠才认为可以校验
+
+
+def _bar_sec(b: Bar) -> int:
+    return b.hour * 3600 + b.minute * 60 + b.second
+
+
+def _bar_ohlc_close(a: Bar, b: Bar, tol: float = MERGE_TOL) -> bool:
+    return (
+        abs(a.open - b.open) <= tol
+        and abs(a.high - b.high) <= tol
+        and abs(a.low - b.low) <= tol
+        and abs(a.close - b.close) <= tol
+    )
+
+
+def _bar_order_key(b: Bar):
+    """跨日/夜盘都正确的排序键：交易日相同，夜盘（>=18:00 或 <06:00）排在日盘前面。"""
+    sec = _bar_sec(b)
+    if sec >= 18 * 3600:
+        return (b.date.toordinal(), 0, sec)
+    if sec < 6 * 3600:
+        return (b.date.toordinal(), 0, sec + 86400)
+    return (b.date.toordinal(), 1, sec)
+
+
+def merge_same_instrument_blocks(
+    blocks: list[list[Bar]],
+    tol: float = MERGE_TOL,
+    min_overlap: int = MERGE_MIN_OVERLAP,
+) -> tuple[list[Bar], dict]:
+    """把多块 K 线按"重叠时段 OHLC 一致"校验后合并成一条序列。
+
+    blocks 中第 0 块是主块（基准）；其余块只有在与当前合并结果重叠、且重叠部分的
+    OHLC 全部一致时才会被并入（链式：先并入与主块重叠的块，再并入与这些块重叠的块）。
+    """
+    if not blocks:
+        return [], {"merged_blocks": 0, "added_bars": 0, "skipped": [], "details": []}
+    merged: dict[tuple, Bar] = {}
+    for b in blocks[0]:
+        merged.setdefault((b.date, _bar_sec(b)), b)
+    pending = list(blocks[1:])
+    used_idx: set[int] = set()
+    info = {"merged_blocks": 0, "added_bars": 0, "skipped": [], "details": []}
+    progress = True
+    while progress and pending:
+        progress = False
+        keep: list[list[Bar]] = []
+        for blk in pending:
+            ov = mism = 0
+            new_bars: list[Bar] = []
+            for b in blk:
+                key = (b.date, _bar_sec(b))
+                cur = merged.get(key)
+                if cur is None:
+                    new_bars.append(b)
+                    continue
+                ov += 1
+                if not _bar_ohlc_close(cur, b, tol):
+                    mism += 1
+            if ov == 0:
+                keep.append(blk)  # 暂无可校验的重叠，留待下一轮（可能通过链式获得重叠）
+                continue
+            if mism > max(2, int(ov * 0.2)):
+                info["skipped"].append((len(blk), ov, mism))
+                continue
+            for b in new_bars:
+                merged[(b.date, _bar_sec(b))] = b
+            info["merged_blocks"] += 1
+            info["added_bars"] += len(new_bars)
+            progress = True
+        pending = keep
+    for blk in pending:
+        info["skipped"].append((len(blk), 0, 0))
+    bars = sorted(merged.values(), key=_bar_order_key)
+    return bars, info
+
+
 def read_current_bars(
     install_key: str = "new_tdxqh",
     prefer_step: int | None = None,
@@ -763,6 +848,37 @@ def read_current_bars(
             for c in fresh[1:6]:
                 log(f"  其他候选：{c}")
         bars, meta = read_candidate_bars(h, chosen, now=now)
+        # 多块合并：股票端秒级 K 线按加载窗口分块缓存，单块常只有 1~2 天；
+        # 把同一周期、与主块在重叠时段 OHLC 完全一致的其它块拼进来（重叠时段校验=同品种判据）。
+        if chosen.kind == "intraday":
+            others = [
+                c
+                for c in cands
+                if c is not chosen
+                and c.kind == "intraday"
+                and c.step == chosen.step
+                and c.count >= MERGE_MIN_OVERLAP
+            ]
+            others.sort(key=lambda c: (-c.count, -c.lastD))
+            blocks: list[list[Bar]] = [bars]
+            for c in others[:12]:
+                try:
+                    extra, _m = read_candidate_bars(h, c, now=now)
+                except Exception:
+                    continue
+                blocks.append(extra)
+            merged_bars, merge_info = merge_same_instrument_blocks(blocks)
+            meta["merge"] = merge_info
+            if merge_info["merged_blocks"]:
+                bars = merged_bars
+                meta["count"] = len(bars)
+                meta["first"] = bars[0]
+                meta["last"] = bars[-1]
+                if log:
+                    log(
+                        f"多块合并：并入 {merge_info['merged_blocks']} 块 / "
+                        f"+{merge_info['added_bars']} 根，合计 {len(bars)} 根"
+                    )
     finally:
         kernel32.CloseHandle(h)
     title = tdx_chart_symbol(pid)
