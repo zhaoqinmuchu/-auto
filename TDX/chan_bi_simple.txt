@@ -1,0 +1,36 @@
+{========== 缠论简化版画笔指标 ==========
+ 功能：顶底分型 + 5根K线成笔
+ 说明：
+   1. 简化版，未做K线包含合并处理，直接在原始K线上判断分型并成笔
+   2. 成笔条件：顶分型与底分型之间至少间隔 5 根K线
+   3. 红色线 = 向上笔（底分型 -> 顶分型）
+      青色线 = 向下笔（顶分型 -> 底分型）
+ 用法：在通达信公式编辑器中新建"主图叠加"指标，粘贴本代码即可}
+
+{---------- 1. 顶底分型判断 ----------
+ 分型点定位在前一根K线（当前K线作为右侧确认K线）
+ 顶分型：前一根最高价最高、最低价也最高
+ 底分型：前一根最低价最低、最高价也最低}
+TOPFX := REF(H,1) > H AND REF(H,1) > REF(H,2) AND REF(L,1) > L AND REF(L,1) > REF(L,2);
+BOTFX := REF(L,1) < L AND REF(L,1) < REF(L,2) AND REF(H,1) < H AND REF(H,1) < REF(H,2);
+
+{---------- 2. 5根K线成笔过滤 ----------
+ 距上一个顶分型的周期数}
+LASTTOP := BARSLAST(TOPFX);
+{距上一个底分型的周期数}
+LASTBOT := BARSLAST(BOTFX);
+
+{有效顶分型：顶分型 且 距上一个底分型 >= 5 根}
+VTOPFX := TOPFX AND LASTBOT >= 5;
+{有效底分型：底分型 且 距上一个顶分型 >= 5 根}
+VBOTFX := BOTFX AND LASTTOP >= 5;
+
+{---------- 3. 画笔（连接有效顶底分型） ----------}
+{底分型 -> 顶分型（向上笔）}
+DRAWLINE(VBOTFX, REF(L,1), VTOPFX, REF(H,1), 0), COLORRED;
+{顶分型 -> 底分型（向下笔）}
+DRAWLINE(VTOPFX, REF(H,1), VBOTFX, REF(L,1), 0), COLORCYAN;
+
+{---------- 4. 标注分型位置 ----------}
+DRAWTEXT(VTOPFX, REF(H,1)*1.005, '顶'), COLORRED;
+DRAWTEXT(VBOTFX, REF(L,1)*0.995, '底'), COLORCYAN;

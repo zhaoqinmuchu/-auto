@@ -1,0 +1,24 @@
+*.py[co]
+__pycache__
+*-checkpoint.ipynb
+*.vscode
+*.log
+*.db
+config.yaml
+OpenConfig.yaml
+gotify_push.py
+cos_config.yaml
+# Local development, verified snapshots, and generated output
+/build/
+/dist/
+/.venv/
+/.local-backups/
+/.local-validation/
+/data/local/
+/A111.txt
+/CUL9.txt
+/SCL9.txt
+/_debug_out.txt
+/test.png
+/chan_seg_*.tni
+/chan_seg_*.txt
