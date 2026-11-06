@@ -15,16 +15,39 @@ REGRESSIONS = ("test_cross_year_infer.py", "test_cross_year_e2e.py", "test_user_
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference", type=Path, help="Verified snapshot source tree; also compares the three private sample files")
+    parser.add_argument("--razor-changes", type=Path,
+                        help="Allow original-file changes listed in this JSON manifest (schema: "
+                             '{"modified": {path: {old_sha256, new_sha256, reason}}, "deleted": {path: reason}, '
+                             '"added": [path]}); default behavior rejects every original-file change')
     parser.add_argument("--output", type=Path, default=ROOT / ".local-validation" / "verification.json")
     args = parser.parse_args()
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8")
     report = {"python": sys.version, "checks": []}
     baseline = json.loads((ROOT / "docs" / "source-baseline-sha256.json").read_text(encoding="utf-8"))
-    for name, expected in baseline.items():
-        actual = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
-        if actual != expected:
-            raise RuntimeError(f"Original source changed: {name}")
-    report["checks"].append({"name": "original_python_bytes", "files": len(baseline), "status": "PASS"})
+    if args.razor_changes:
+        import razor_acceptance
+        manifest_path = args.razor_changes if args.razor_changes.is_absolute() else ROOT / args.razor_changes
+        if not manifest_path.is_file():
+            raise RuntimeError(f"Change manifest missing: {manifest_path} (schema: {razor_acceptance.MANIFEST_SCHEMA})")
+        problems = []
+        manifest = razor_acceptance.validate_manifest(
+            json.loads(manifest_path.read_text(encoding="utf-8")), problems)
+        if problems:
+            raise RuntimeError(f"Change manifest invalid: {problems}; schema: {razor_acceptance.MANIFEST_SCHEMA}")
+        enforced = razor_acceptance.enforce_baseline_bytes(baseline, manifest)
+        if enforced["problems"]:
+            raise RuntimeError("Original source changed without a manifest allowance: "
+                               + json.dumps(enforced["problems"], ensure_ascii=False))
+        report["checks"].append({"name": "original_python_bytes", "files": len(baseline), "status": "PASS",
+                                 "manifest": str(manifest_path),
+                                 "modified": enforced["allowed_modified"],
+                                 "deleted": [item["path"] for item in enforced["allowed_deleted"]]})
+    else:
+        for name, expected in baseline.items():
+            actual = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
+            if actual != expected:
+                raise RuntimeError(f"Original source changed: {name}")
+        report["checks"].append({"name": "original_python_bytes", "files": len(baseline), "status": "PASS"})
     count = 0
     for path in ROOT.rglob("*.py"):
         if any(part in {".git", ".venv", ".local-backups", ".local-validation", "build", "dist", "__pycache__"} for part in path.relative_to(ROOT).parts):
