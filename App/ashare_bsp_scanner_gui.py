@@ -56,7 +56,7 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QGroupBox,
     QMessageBox, QStatusBar, QSplitter, QFileDialog, QInputDialog
 )
-from PyQt6.QtCore import QDate, Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QDate, QTimer, Qt, QThread, pyqtSignal
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -483,6 +483,36 @@ class AkshareGUI(QMainWindow):
         poly_hint.setStyleSheet("color: #888888; font-size: 11px;")
         single_layout.addWidget(poly_hint)
 
+        # 一键复制到剪贴板：不保存文件，直接粘贴到达通信用公式编辑器
+        copy_row = QHBoxLayout()
+        copy_row.addWidget(QLabel("复制:"))
+        self.copy_format_combo = QComboBox()
+        self.copy_format_combo.addItem("折线版（推荐）", "poly")
+        self.copy_format_combo.addItem("映射版（DRAWLINE）", "mapped")
+        self.copy_format_combo.addItem("原始线段（DRAWLINE）", "seg")
+        copy_row.addWidget(self.copy_format_combo)
+        self.copy_btn = QPushButton("复制公式到剪贴板")
+        self.copy_btn.clicked.connect(self.copy_formula_to_clipboard)
+        self.copy_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1B5E20;
+                color: white;
+                font-size: 13px;
+                padding: 8px;
+                border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #0D3D12; }
+        """)
+        copy_row.addWidget(self.copy_btn)
+        single_layout.addLayout(copy_row)
+
+        copy_hint = QLabel(
+            "点一下直接把公式复制到剪贴板：到达通信用 公式管理器→新建→Ctrl+V 粘贴即可，不用先保存文件"
+        )
+        copy_hint.setWordWrap(True)
+        copy_hint.setStyleSheet("color: #888888; font-size: 11px;")
+        single_layout.addWidget(copy_hint)
+
         self.map_period_combo.currentIndexChanged.connect(self._update_map_period_hint)
         self._update_map_period_hint()
 
@@ -830,6 +860,46 @@ class AkshareGUI(QMainWindow):
         if hasattr(self, "poly_export_btn"):
             self.poly_export_btn.setText(f"导出{period}分钟折线版")
 
+    def _flash_btn_text(self, btn, text, revert_ms=1600):
+        """把按钮文字临时改成 text，再自动恢复。"""
+        if btn is None:
+            return
+        old = getattr(self, "_copy_btn_origin_text", None)
+        if old is None:
+            old = btn.text()
+            self._copy_btn_origin_text = old
+        btn.setText(text)
+        QTimer.singleShot(revert_ms, lambda: btn.setText(old))
+
+    def copy_formula_to_clipboard(self):
+        """把当前线段公式直接复制到剪贴板（不保存文件）。
+
+        通达信没有"从剪贴板导入公式"的接口，但公式编辑器支持 Ctrl+V，
+        所以把生成的公式源码放到剪贴板，用户切到通达信粘贴即可，
+        省掉"先另存为 .tni → 打开记事本 → 全选复制"这一串操作。
+        """
+        if not self.chan:
+            QMessageBox.warning(self, "警告", "请先分析一只股票，再复制公式")
+            return
+
+        fmt = "poly"
+        if hasattr(self, "copy_format_combo"):
+            fmt = self.copy_format_combo.currentData() or "poly"
+        period = 5
+        if hasattr(self, "map_period_combo"):
+            data = self.map_period_combo.currentData()
+            if data:
+                period = int(data)
+
+        if fmt == "poly":
+            ok = self.export_tdx_polyline_formula(copy_only=True)
+        elif fmt == "mapped":
+            ok = self._export_tdx_seg_formula_impl(period, copy_only=True)
+        else:
+            ok = self._export_tdx_seg_formula_impl(None, copy_only=True)
+        if ok:
+            self._flash_btn_text(self.copy_btn, "已复制 ✓")
+
     def _tdx_poly_cond(self, klu, map_period):
         """折线版定位条件：返回 (date_val, hour, minute)。
 
@@ -852,7 +922,7 @@ class AkshareGUI(QMainWindow):
             return f"DATE={date_val} AND TIME=0"
         return f"DATE={date_val} AND TIME={hour * 100 + minute}"
 
-    def export_tdx_polyline_formula(self):
+    def export_tdx_polyline_formula(self, copy_only=False):
         """折线版导出：用一条 PLOYLINE 画出全部线段（可选叠加红色未确定末段）。
 
         背景（已在通达信里实测确认）：
@@ -867,7 +937,7 @@ class AkshareGUI(QMainWindow):
         """
         if not self.chan:
             QMessageBox.warning(self, "警告", "请先分析一只股票，再导出折线版公式")
-            return
+            return False
 
         try:
             period = 5
@@ -880,7 +950,7 @@ class AkshareGUI(QMainWindow):
             seg_list = kl_list.seg_list
             if len(seg_list) == 0:
                 QMessageBox.warning(self, "警告", "当前没有划分出线段，无法导出")
-                return
+                return False
 
             # 1) 收集线段端点（起点、终点交替）
             raw_pts = []  # (cond, price)
@@ -940,7 +1010,7 @@ class AkshareGUI(QMainWindow):
                     QMessageBox.StandardButton.No,
                 )
                 if reply != QMessageBox.StandardButton.Yes:
-                    return
+                    return False
 
             lines = []
             lines.append("{缠论线段折线版 - 由 chan.py 自动生成}")
@@ -985,6 +1055,14 @@ class AkshareGUI(QMainWindow):
 
             content = "\n".join(lines) + "\n"
 
+            if copy_only:
+                QApplication.clipboard().setText(content)
+                self.statusBar.showMessage(
+                    f"已复制通达信折线版公式到剪贴板（{int(period)}分钟映射，"
+                    f"{len(seg_list)}条线段/{len(vertices)}个顶点），到公式编辑器 Ctrl+V 粘贴"
+                )
+                return True
+
             default_name = f"chan_seg_{self.chan.code}_{int(period)}m_polyline.tni"
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
@@ -993,7 +1071,7 @@ class AkshareGUI(QMainWindow):
                 "通达信公式文件 (*.tni);;文本文件 (*.txt);;所有文件 (*.*)",
             )
             if not file_path:
-                return
+                return False
 
             with open(file_path, 'w', encoding='gbk', errors='ignore') as f:
                 f.write(content)
@@ -1020,10 +1098,12 @@ class AkshareGUI(QMainWindow):
                     os.startfile(file_path)
                 except Exception as e:
                     QMessageBox.warning(self, "打开失败", f"无法打开文件:\n{file_path}\n\n错误: {e}")
+            return True
         except Exception as e:
             QMessageBox.critical(self, "导出错误", str(e))
+            return False
 
-    def _export_tdx_seg_formula_impl(self, map_period=None):
+    def _export_tdx_seg_formula_impl(self, map_period=None, copy_only=False):
         """
         将当前分析的线段划分导出为通达信公式文件(.tni)。
 
@@ -1059,7 +1139,7 @@ class AkshareGUI(QMainWindow):
         """
         if not self.chan:
             QMessageBox.warning(self, "警告", "请先分析一只股票，再导出线段公式")
-            return
+            return False
 
         try:
             kl_list = self.chan[0]  # 当前级别 CKLine_List
@@ -1067,7 +1147,7 @@ class AkshareGUI(QMainWindow):
 
             if len(seg_list) == 0:
                 QMessageBox.warning(self, "警告", "当前没有划分出线段，无法导出")
-                return
+                return False
 
             # 判断当前数据是否为秒级K线（如5秒）。
             # 秒级K线的秒字段非零（如 00:00:05），分钟级K线秒恒为0。
@@ -1207,6 +1287,20 @@ class AkshareGUI(QMainWindow):
 
             content = "\n".join(lines) + "\n"
 
+            if copy_only:
+                QApplication.clipboard().setText(content)
+                if map_period:
+                    self.statusBar.showMessage(
+                        f"已复制通达信公式到剪贴板（{int(map_period)}分钟映射版，"
+                        f"{len(seg_list)}条线段），到公式编辑器 Ctrl+V 粘贴"
+                    )
+                else:
+                    self.statusBar.showMessage(
+                        f"已复制通达信公式到剪贴板（原始线段版，{len(seg_list)}条线段），"
+                        "到公式编辑器 Ctrl+V 粘贴"
+                    )
+                return True
+
             # 选择保存路径
             if map_period:
                 default_name = f"chan_seg_{self.chan.code}_{int(map_period)}m.tni"
@@ -1221,7 +1315,7 @@ class AkshareGUI(QMainWindow):
                 "通达信公式文件 (*.tni);;文本文件 (*.txt);;所有文件 (*.*)",
             )
             if not file_path:
-                return
+                return False
 
             # 通达信公式文件通常使用 GBK 编码
             with open(file_path, 'w', encoding='gbk', errors='ignore') as f:
@@ -1256,8 +1350,10 @@ class AkshareGUI(QMainWindow):
                     os.startfile(file_path)
                 except Exception as e:
                     QMessageBox.warning(self, "打开失败", f"无法打开文件:\n{file_path}\n\n错误: {e}")
+            return True
         except Exception as e:
             QMessageBox.critical(self, "导出错误", str(e))
+            return False
 
     def plot_chart(self):
         """
