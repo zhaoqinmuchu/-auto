@@ -6,7 +6,8 @@ from PyInstaller.utils.hooks import collect_all
 # daily bars. PyInstaller cannot see those string imports, so list them explicitly.
 datas = []
 binaries = []
-hiddenimports = ['DataAPI.BaoStockAPI', 'DataAPI.TencentAPI', 'DataAPI.TDX_TXT_API']
+hiddenimports = ['DataAPI.BaoStockAPI', 'DataAPI.TencentAPI', 'DataAPI.TDX_TXT_API',
+                 'TdxBridge', 'TdxBridge.mem_reader']
 for package in ['Common', 'Bi', 'Seg', 'ZS', 'KLine', 'Combiner', 'Math', 'Plot', 'DataAPI',
                 'BuySellPoint']:
     tmp_ret = collect_all(package)

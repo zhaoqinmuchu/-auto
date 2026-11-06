@@ -30,7 +30,9 @@ ChanScanner - 缠论图表分析工具 - Powered by chan.py
     python App/ashare_bsp_scanner_gui.py
 """
 import os
+import re
 import sys
+import tempfile
 from pathlib import Path
 
 # 禁用系统代理，避免代理无法访问国内行情接口（如东方财富）导致连接失败
@@ -64,6 +66,19 @@ import matplotlib.pyplot as plt
 from Chan import CChan
 from ChanConfig import CChanConfig
 from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
+
+try:  # 通达信内存直读模块（可选依赖 numpy；缺失时 GUI 其余功能仍可用）
+    from TdxBridge.mem_reader import (
+        read_current_bars as tdx_read_current_bars,
+        ref_begin_time as tdx_ref_begin_time,
+        write_tdx_txt as tdx_write_txt,
+    )
+    TDX_LIVE_AVAILABLE = True
+except Exception:  # pragma: no cover - 缺省降级
+    tdx_read_current_bars = None
+    tdx_ref_begin_time = None
+    tdx_write_txt = None
+    TDX_LIVE_AVAILABLE = False
 
 
 def to_baostock_code(code):
@@ -364,6 +379,28 @@ class AkshareGUI(QMainWindow):
         import_hint.setStyleSheet("color: #888888; font-size: 11px;")
         single_layout.addWidget(import_hint)
 
+        # 从通达信内存直接读取当前图表（免手工导出）
+        live_row = QHBoxLayout()
+        self.live_read_btn = QPushButton("读取当前图(通达信)")
+        self.live_read_btn.clicked.connect(self.read_from_tdx_live)
+        self.live_read_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00897B;
+                color: white;
+                font-size: 13px;
+                padding: 8px;
+                border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #00695C; }
+        """)
+        live_row.addWidget(self.live_read_btn)
+        single_layout.addLayout(live_row)
+
+        live_hint = QLabel("直接从通达信内存读取当前图表的K线（不用先导出文件）；需期货通已打开目标品种，自动识别5秒/10秒周期")
+        live_hint.setWordWrap(True)
+        live_hint.setStyleSheet("color: #888888; font-size: 11px;")
+        single_layout.addWidget(live_hint)
+
         # 导出通达信线段公式
         export_row = QHBoxLayout()
         self.export_btn = QPushButton("导出通达信线段公式")
@@ -633,6 +670,82 @@ class AkshareGUI(QMainWindow):
             period_text="1分钟",
             days=365,
             file_path=file_path,
+            begin_time=begin_time,
+        )
+        self.analysis_thread.finished.connect(self.on_analysis_finished)
+        self.analysis_thread.error.connect(self.on_analysis_error)
+        self.analysis_thread.start()
+
+    def read_from_tdx_live(self):
+        """从通达信进程内存直接读取当前图表的K线并分析（免手工导出）。"""
+        if not TDX_LIVE_AVAILABLE:
+            QMessageBox.warning(
+                self,
+                "不可用",
+                "未找到通达信内存直读模块 TdxBridge/mem_reader.py（或缺少 numpy）。\n"
+                "请确认程序目录下有 TdxBridge 文件夹。",
+            )
+            return
+
+        self.live_read_btn.setEnabled(False)
+        self.statusBar.showMessage("正在从通达信内存读取当前图表K线（约5~15秒）...")
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            bars, meta = tdx_read_current_bars(install_key="new_tdxqh")
+        except Exception as e:
+            QApplication.restoreOverrideCursor()
+            self.live_read_btn.setEnabled(True)
+            QMessageBox.warning(
+                self,
+                "读取失败",
+                "从通达信读取数据失败：\n%s\n\n请确认：\n"
+                "1) 通达信期货通已打开，并已显示目标品种的K线图；\n"
+                "2) 本程序与通达信以相同权限运行（不要只把其中一个用管理员运行）；\n"
+                "3) 暂只支持期货通（new_tdxqh），证券端暂不支持。" % e,
+            )
+            self.statusBar.showMessage("读取通达信失败")
+            return
+        QApplication.restoreOverrideCursor()
+        self.live_read_btn.setEnabled(True)
+
+        step = int(meta.get("step") or 0)
+        period_text = {1: "1秒", 5: "5秒", 10: "10秒", 15: "15秒", 30: "30秒", 60: "1分钟"}.get(
+            step, "%d秒" % step
+        )
+        symbol = (meta.get("symbol") or "").strip() or "当前图"
+        safe_symbol = re.sub(r'[\\/:*?"<>|]', "_", symbol)
+
+        tmp_dir = os.path.join(tempfile.gettempdir(), "tdx_live")
+        os.makedirs(tmp_dir, exist_ok=True)
+        txt_path = os.path.join(tmp_dir, "%s_%ss.txt" % (safe_symbol, step))
+        try:
+            tdx_write_txt(txt_path, bars, title="%s (%s)" % (symbol, period_text))
+            begin_time = tdx_ref_begin_time(bars)
+        except Exception as e:
+            QMessageBox.warning(self, "读取失败", "写出临时TXT失败：\n%s" % e)
+            return
+
+        first, last = meta["first"], meta["last"]
+        self.code_input.setText(symbol)
+        self.statusBar.showMessage(
+            "已从通达信读取 %d 根 %s K线（%s，%04d-%02d-%02d %02d:%02d → %04d-%02d-%02d %02d:%02d），开始分析..."
+            % (
+                len(bars),
+                period_text,
+                symbol,
+                first.date.year, first.date.month, first.date.day, first.hour, first.minute,
+                last.date.year, last.date.month, last.date.day, last.hour, last.minute,
+            )
+        )
+
+        self.analyze_btn.setEnabled(False)
+        config = self.get_chan_config()
+        self.analysis_thread = SingleAnalysisThread(
+            safe_symbol,
+            config,
+            period_text=period_text,
+            days=365,
+            file_path=txt_path,
             begin_time=begin_time,
         )
         self.analysis_thread.finished.connect(self.on_analysis_finished)
