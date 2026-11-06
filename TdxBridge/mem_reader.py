@@ -297,6 +297,20 @@ REC_DTYPE = np.dtype(
     }
 )
 
+# 日线记录（证券终端/日线周期）的布局与日内不同：
+#   [date int32][O,H,L,C float32][amount float32][volume int32][X int32] = 32 字节
+# 即日期在最前面。因为 REC_DTYPE 以 float 段对齐时 D(+28) 读到的其实是
+# "下一根记录的日期"，所以扫描日线时仍用 REC_DTYPE 找连续段，再把起始地址
+# 往前挪 4 字节、多读一根，用 DAILY_DTYPE 真正解析。
+DAILY_DTYPE = np.dtype(
+    {
+        "names": ["D", "O", "H", "L", "C", "A", "V", "X"],
+        "formats": ["<i4", "<f4", "<f4", "<f4", "<f4", "<f4", "<i4", "<i4"],
+        "offsets": [0, 4, 8, 12, 16, 20, 24, 28],
+        "itemsize": 32,
+    }
+)
+
 # 已知通达信周期步长（秒）
 KNOWN_STEPS = {1, 2, 3, 5, 10, 15, 20, 30, 60, 120, 180, 300, 600, 900, 1800, 3600}
 
@@ -325,12 +339,44 @@ class Candidate:
     firstC: float
     lastC: float
     protect: int = 0
+    kind: str = "intraday"  # "intraday"（秒/分钟）或 "daily"（日线）
+    ptr_hits: int = 0  # 内存里有多少个指针引用该数组（当前图表的数组通常被结构引用）
 
     def __str__(self) -> str:
         return (
-            f"addr=0x{self.addr:x} count={self.count} step={self.step} "
-            f"lastD={self.lastD} price {self.firstC:.2f}->{self.lastC:.2f}"
+            f"addr=0x{self.addr:x} kind={self.kind} count={self.count} step={self.step} "
+            f"lastD={self.lastD} price {self.firstC:.2f}->{self.lastC:.2f} refs={self.ptr_hits}"
         )
+
+
+def _runs(mask: np.ndarray, min_count: int) -> list[tuple[int, int]]:
+    """把布尔掩码里的连续 True 段找出来，返回 [(start, end_exclusive)]。"""
+    edges = np.flatnonzero(np.diff(np.concatenate(([0], mask.astype(np.int8), [0]))))
+    starts = edges[0::2]
+    ends = edges[1::2]
+    return [(int(s), int(e)) for s, e in zip(starts, ends) if e - s >= min_count]
+
+
+def _is_date_int(v: int) -> bool:
+    """判断一个 int 是否像 YYYYMMDD 日期。"""
+    if not (19900101 <= v <= 21001231):
+        return False
+    md = v % 10000
+    return 101 <= md <= 1231
+
+
+def _daily_mask(rec: np.ndarray) -> np.ndarray:
+    """日线候选掩码：float 段合法 + D(+28) 是"下一根日期"。"""
+    o, hgh, low, close = rec["O"], rec["H"], rec["L"], rec["C"]
+    m = (o > 0.5) & (hgh > 0.5) & (low > 0.5) & (close > 0.5)
+    m &= (hgh < 2.0e5) & (low <= np.minimum(o, close)) & (np.maximum(o, close) <= hgh)
+    d = rec["D"].astype(np.int64)
+    m &= (d >= 19900101) & (d <= 21001231)
+    md = d % 10000
+    m &= (md >= 101) & (md <= 1231)
+    m &= (rec["V"] >= 0) & (rec["V"] < 2_000_000_000)
+    return m
+
 
 
 def scan_candidates(
@@ -357,36 +403,61 @@ def scan_candidates(
             if n < min_count:
                 continue
             rec = np.frombuffer(data, dtype=REC_DTYPE, count=n, offset=phase)
+
+            # ① 秒/分钟级：D(+28) = 交易日序号*86400 + 秒
             m = valid_mask(rec)
-            if int(m.sum()) < min_count:
-                continue
-            edges = np.flatnonzero(np.diff(np.concatenate(([0], m.astype(np.int8), [0]))))
-            starts = edges[0::2]
-            ends = edges[1::2]
-            for s, e in zip(starts.tolist(), ends.tolist()):
-                cnt = e - s
-                if cnt < min_count:
-                    continue
-                sub = rec[s:e]
-                ds = sub["D"].astype(np.int64)
-                dd = np.diff(ds)
-                pos = dd[(dd > 0) & (dd <= 90000)]
-                if pos.size == 0:
-                    continue
-                vals, cnts = np.unique(pos, return_counts=True)
-                step = int(vals[int(np.argmax(cnts))])
-                cands.append(
-                    Candidate(
-                        addr=base + phase + s * 32,
-                        count=int(cnt),
-                        step=step,
-                        firstD=int(ds[0]),
-                        lastD=int(ds[-1]),
-                        firstC=float(sub["C"][0]),
-                        lastC=float(sub["C"][-1]),
-                        protect=protect,
+            if int(m.sum()) >= min_count:
+                for s, e in _runs(m, min_count):
+                    sub = rec[s:e]
+                    ds = sub["D"].astype(np.int64)
+                    dd = np.diff(ds)
+                    pos = dd[(dd > 0) & (dd <= 90000)]
+                    if pos.size == 0:
+                        continue
+                    vals, cnts = np.unique(pos, return_counts=True)
+                    step = int(vals[int(np.argmax(cnts))])
+                    cands.append(
+                        Candidate(
+                            addr=base + phase + s * 32,
+                            count=int(e - s),
+                            step=step,
+                            firstD=int(ds[0]),
+                            lastD=int(ds[-1]),
+                            firstC=float(sub["C"][0]),
+                            lastC=float(sub["C"][-1]),
+                            protect=protect,
+                        )
                     )
-                )
+
+            # ② 日线：REC_DTYPE 视图里 D(+28) 是"下一根的日期"，
+            #    因此真实数组起点要往前挪 4 字节，段内每根 + 段后一根共 cnt+1 根。
+            md = _daily_mask(rec)
+            if int(md.sum()) >= min_count:
+                for s, e in _runs(md, min_count):
+                    real1 = base + phase + s * 32 - 4          # 本段第一根的记录起点
+                    cnt1 = (e - s) + 1                          # 含段后那根（其日期在上一根的 +28）
+                    first_buf = read_mem(h, real1, 4)
+                    last_buf = read_mem(h, real1 + (cnt1 - 1) * 32, 4)
+                    if len(first_buf) < 4 or len(last_buf) < 4:
+                        continue
+                    d0 = int(np.frombuffer(first_buf, dtype="<i4")[0])
+                    d1 = int(np.frombuffer(last_buf, dtype="<i4")[0])
+                    if not _is_date_int(d0) or not _is_date_int(d1) or d1 < d0:
+                        continue
+                    sub = rec[s:e]
+                    cands.append(
+                        Candidate(
+                            addr=real1,
+                            count=int(cnt1),
+                            step=0,
+                            firstD=d0,
+                            lastD=d1,
+                            firstC=float(sub["C"][0]),
+                            lastC=float(sub["C"][-1]),
+                            protect=protect,
+                            kind="daily",
+                        )
+                    )
     stats = {
         "regions": len(regions),
         "scanned_bytes": scanned,
@@ -399,24 +470,78 @@ def scan_candidates(
     return cands, stats
 
 
+def _cand_time_key(c: Candidate) -> int:
+    """把候选"最后一根时间"归一成秒（日线按 15:00 折算成 交易日序号*86400+54000）。"""
+    if c.kind != "daily":
+        return c.lastD
+    try:
+        y, md = divmod(int(c.lastD), 10000)
+        mo, dd = divmod(md, 100)
+        days = (dt.date(y, mo, dd) - TDX_DAY_EPOCH).days
+    except ValueError:
+        return -1
+    return days * 86400 + 54000
+
+
+def count_ptr_refs(h, addrs: list[int], max_hits_per_addr: int = 50) -> dict[int, int]:
+    """统计内存里有多少个 8 字节指针指向这些数组地址。
+
+    通达信会把"当前正在看的图表"的 K 线数组挂在内部结构上（存在指针引用），
+    而之前看过、仍残留在内存里的其它品种数组通常没有引用。
+    """
+    counts = {a: 0 for a in addrs}
+    want = set(addrs)
+    for base, size, protect in iter_regions(h):
+        data = read_mem(h, base, size)
+        if len(data) < 8:
+            continue
+        u32 = np.frombuffer(data[: len(data) // 4 * 4], dtype="<u4")
+        for a in want:
+            if counts[a] >= max_hits_per_addr:
+                continue
+            idx = np.flatnonzero(u32 == np.uint32(a & 0xFFFFFFFF))
+            for i in idx.tolist():
+                if i + 1 < len(u32) and int(u32[i + 1]) == (a >> 32):
+                    counts[a] += 1
+                    if counts[a] >= max_hits_per_addr:
+                        break
+    return counts
+
+
 def select_candidates(
     cands: list[Candidate], prefer_step: int | None = None, fresh_margin: int = 180
 ) -> list[Candidate]:
-    """挑选"当前图表"候选：时间最新 + 记录最多（去重拷贝）。"""
-    known = [c for c in cands if c.step in KNOWN_STEPS]
+    """挑选"当前图表"候选：时间最新 + 记录最多（去重拷贝）。
+
+    秒/分钟级按 180 秒容差取最新；日线按 3 天容差取最新。
+    """
+    known = [c for c in cands if c.kind == "daily" or c.step in KNOWN_STEPS]
     if not known:
         raise RuntimeError("内存里没找到像样的 K 线记录段（通达信是否打开了图表？）")
-    max_last = max(c.lastD for c in known)
-    fresh = [c for c in known if c.lastD >= max_last - fresh_margin]
+    intra = [c for c in known if c.kind != "daily"]
+    daily = [c for c in known if c.kind == "daily"]
+    fresh: list[Candidate] = []
+    if intra:
+        mx = max(c.lastD for c in intra)
+        fresh.extend(c for c in intra if c.lastD >= mx - fresh_margin)
+    if daily:
+        mxk = max(_cand_time_key(c) for c in daily)
+        fresh.extend(c for c in daily if _cand_time_key(c) >= mxk - 3 * 86400)
     if prefer_step:
         pref = [c for c in fresh if c.step == prefer_step]
         if pref:
             fresh = pref
     uniq: dict[tuple, Candidate] = {}
     for c in fresh:
-        uniq.setdefault((c.count, c.step, c.firstD, c.lastD), c)
-    out = sorted(uniq.values(), key=lambda c: (-c.count, -c.lastD))
+        # 去重键要带价格：不同品种的日线数组可能根数完全相同（如都是 700 根、到同一天），
+        # 只按键值去重会把不同品种误当成同一份拷贝。
+        uniq.setdefault(
+            (c.kind, c.count, c.step, c.firstD, c.lastD, round(c.firstC, 2), round(c.lastC, 2)),
+            c,
+        )
+    out = sorted(uniq.values(), key=lambda c: (-int(c.ptr_hits > 0), -c.count, -_cand_time_key(c)))
     return out
+
 
 
 # ---------------------------------------------------------------------------
@@ -514,6 +639,50 @@ def read_candidate_bars(
     h, cand: Candidate, now: dt.datetime | None = None
 ) -> tuple[list[Bar], dict]:
     """按候选段地址读出全部 K 线并解码。"""
+    if cand.kind == "daily":
+        raw = read_mem(h, cand.addr, cand.count * 32)
+        cnt = len(raw) // 32
+        if cnt <= 0:
+            raise RuntimeError("读取日线数组失败")
+        rec = np.frombuffer(raw, dtype=DAILY_DTYPE, count=cnt)
+        dates: list[dt.date] = []
+        for i in range(cnt):
+            v = int(rec["D"][i])
+            if not _is_date_int(v):
+                raise RuntimeError(f"日线记录日期异常：{v}（addr=0x{cand.addr + i * 32:x}）")
+            y, md = divmod(v, 10000)
+            mo, dd = divmod(md, 100)
+            dates.append(dt.date(y, mo, dd))
+        bars: list[Bar] = []
+        for i in range(cnt):
+            bars.append(
+                Bar(
+                    date=dates[i],
+                    hour=0,
+                    minute=0,
+                    second=0,
+                    open=float(rec["O"][i]),
+                    high=float(rec["H"][i]),
+                    low=float(rec["L"][i]),
+                    close=float(rec["C"][i]),
+                    volume=int(rec["V"][i]),
+                    dn=0,
+                    flagged=False,
+                )
+            )
+        meta = {
+            "step": 0,
+            "kind": "daily",
+            "count": len(bars),
+            "anchor": dates[-1],
+            "addr": cand.addr,
+            "dn_last": 0,
+            "ptr_hits": cand.ptr_hits,
+            "first": bars[0],
+            "last": bars[-1],
+        }
+        return bars, meta
+
     raw = read_mem(h, cand.addr, cand.count * 32)
     cnt = len(raw) // 32
     if cnt <= 0:
@@ -587,17 +756,30 @@ def read_candidate_bars(
 
 
 def write_tdx_txt(path: str, bars: list[Bar], title: str = "") -> str:
-    """按通达信导出格式写 TXT（GBK，行首空格，制表符分隔）。"""
+    """按通达信导出格式写 TXT（GBK，行首空格，制表符分隔）。
+
+    日线（全部 bar 的时分秒都是 0，或 meta['kind']=='daily'）写成纯日期 YYYY/MM/DD，
+    与通达信导出的日线格式一致（TDX_TXT_API 会识别为日线）。
+    """
+    daily = bool(bars) and all(
+        b.hour == 0 and b.minute == 0 and b.second == 0 for b in bars[:5]
+    )
     with open(path, "w", encoding="gbk", newline="") as f:
         if title:
             f.write(title + "\r\n")
             f.write("\r\n")
         f.write("时间\t开盘\t最高\t最低\t收盘\t成交量\r\n")
         for b in bars:
-            f.write(
-                " %02d/%02d:%02d:%02d\t%.2f\t%.2f\t%.2f\t%.2f\t%d\r\n"
-                % (b.date.day, b.hour, b.minute, b.second, b.open, b.high, b.low, b.close, b.volume)
-            )
+            if daily:
+                f.write(
+                    " %04d/%02d/%02d\t%.2f\t%.2f\t%.2f\t%.2f\t%d\r\n"
+                    % (b.date.year, b.date.month, b.date.day, b.open, b.high, b.low, b.close, b.volume)
+                )
+            else:
+                f.write(
+                    " %02d/%02d:%02d:%02d\t%.2f\t%.2f\t%.2f\t%.2f\t%d\r\n"
+                    % (b.date.day, b.hour, b.minute, b.second, b.open, b.high, b.low, b.close, b.volume)
+                )
     return path
 
 
@@ -619,6 +801,25 @@ def read_current_bars(
     try:
         cands, stats = scan_candidates(h, log=log)
         fresh = select_candidates(cands, prefer_step=prefer_step)
+        # "当前图表"判据：通达信会把正在看的图表的 K 线数组挂在内部结构上（有指针引用），
+        # 而之前看过、仍残留在内存里的其它品种/周期数组引用通常更少或没有。
+        # 日线数组的引用常指向数组起点，秒级数组的引用有时指向起点前 4/36 字节，故偏移都算。
+        # 排序规则：先"有引用"优先，再按根数（同品种多份拷贝取最长的那份），最后按时间。
+        if len(fresh) > 1:
+            try:
+                offsets = (-36, -4, 0, 4)
+                ref_addrs = []
+                for c in fresh:
+                    ref_addrs.extend(c.addr + d for d in offsets)
+                refs = count_ptr_refs(h, sorted(set(ref_addrs)))
+                for c in fresh:
+                    c.ptr_hits = int(sum(refs.get(c.addr + d, 0) for d in offsets))
+                fresh.sort(
+                    key=lambda c: (-int(c.ptr_hits > 0), -c.count, -_cand_time_key(c))
+                )
+            except Exception as e:  # 指针统计失败不影响主流程
+                if log:
+                    log(f"指针引用统计失败（忽略）：{e}")
         chosen = fresh[0]
         if log:
             log(f"选中数据段：{chosen}")

@@ -463,9 +463,12 @@ class AkshareGUI(QMainWindow):
 
         # 从通达信内存直接读取当前图表（免手工导出）；紧挨着下面的"复制公式"按钮，
         # 因为日常流程就是：切品种 → 读取当前图 → 复制公式 → 通达信里 Ctrl+V。
+        # 两个终端各一个按钮：左=期货通(C:\new_tdxqh)，右=华泰海通证券(C:\证券\zhenquanhaitong\newVer)
         live_row = QHBoxLayout()
-        self.live_read_btn = QPushButton("读取当前图(通达信)")
-        self.live_read_btn.clicked.connect(self.read_from_tdx_live)
+        self.live_read_btn = QPushButton("读取当前图(期货通)")
+        self.live_read_btn.clicked.connect(
+            lambda: self.read_from_tdx_live("new_tdxqh", "期货通")
+        )
         self.live_read_btn.setStyleSheet("""
             QPushButton {
                 background-color: #00897B;
@@ -477,9 +480,29 @@ class AkshareGUI(QMainWindow):
             QPushButton:hover { background-color: #00695C; }
         """)
         live_row.addWidget(self.live_read_btn)
+
+        self.live_read_btn_ht = QPushButton("读取当前图(华泰海通)")
+        self.live_read_btn_ht.clicked.connect(
+            lambda: self.read_from_tdx_live("zhenquanhaitong", "华泰海通证券")
+        )
+        self.live_read_btn_ht.setStyleSheet("""
+            QPushButton {
+                background-color: #1E88E5;
+                color: white;
+                font-size: 13px;
+                padding: 8px;
+                border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #1565C0; }
+        """)
+        live_row.addWidget(self.live_read_btn_ht)
         single_layout.addLayout(live_row)
 
-        live_hint = QLabel("直接从通达信内存读取当前图表的K线（不用先导出文件）；需期货通已打开目标品种，自动识别5秒/10秒周期")
+        live_hint = QLabel(
+            "直接从通达信内存读取当前图表的K线（不用先导出文件）："
+            "左=期货通（5秒/10秒自动识别），右=华泰海通证券（日线/10秒）；"
+            "读哪个品种取决于对应终端当前显示的图表"
+        )
         live_hint.setWordWrap(True)
         live_hint.setStyleSheet("color: #888888; font-size: 11px;")
         single_layout.addWidget(live_hint)
@@ -707,8 +730,11 @@ class AkshareGUI(QMainWindow):
         self.analysis_thread.error.connect(self.on_analysis_error)
         self.analysis_thread.start()
 
-    def read_from_tdx_live(self):
-        """从通达信进程内存直接读取当前图表的K线并分析（免手工导出）。"""
+    def read_from_tdx_live(self, install_key="new_tdxqh", terminal_name="期货通"):
+        """从通达信进程内存直接读取当前图表的K线并分析（免手工导出）。
+
+        install_key: "new_tdxqh"=期货通(C:\\new_tdxqh)，"zhenquanhaitong"=华泰海通证券(newVer)。
+        """
         if not TDX_LIVE_AVAILABLE:
             QMessageBox.warning(
                 self,
@@ -718,39 +744,51 @@ class AkshareGUI(QMainWindow):
             )
             return
 
-        self.live_read_btn.setEnabled(False)
-        self.statusBar.showMessage("正在从通达信内存读取当前图表K线（约5~15秒）...")
+        btn = self.live_read_btn
+        if install_key != "new_tdxqh" and hasattr(self, "live_read_btn_ht"):
+            btn = self.live_read_btn_ht
+        btn.setEnabled(False)
+        self.statusBar.showMessage(
+            "正在从%s内存读取当前图表K线（约5~20秒）..." % terminal_name
+        )
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            bars, meta = tdx_read_current_bars(install_key="new_tdxqh")
+            bars, meta = tdx_read_current_bars(install_key=install_key)
         except Exception as e:
             QApplication.restoreOverrideCursor()
-            self.live_read_btn.setEnabled(True)
+            btn.setEnabled(True)
             QMessageBox.warning(
                 self,
                 "读取失败",
-                "从通达信读取数据失败：\n%s\n\n请确认：\n"
-                "1) 通达信期货通已打开，并已显示目标品种的K线图；\n"
+                "从%s读取数据失败：\n%s\n\n请确认：\n"
+                "1) 对应通达信终端已打开，并已显示目标品种的K线图；\n"
                 "2) 本程序与通达信以相同权限运行（不要只把其中一个用管理员运行）；\n"
-                "3) 暂只支持期货通（new_tdxqh），证券端暂不支持。" % e,
+                "3) 首次使用请先在终端里把目标图表切到前台（程序按当前前台图表识别品种）。"
+                % (terminal_name, e),
             )
-            self.statusBar.showMessage("读取通达信失败")
+            self.statusBar.showMessage("读取%s失败" % terminal_name)
             return
         QApplication.restoreOverrideCursor()
-        self.live_read_btn.setEnabled(True)
+        btn.setEnabled(True)
 
         step = int(meta.get("step") or 0)
-        period_text = {1: "1秒", 5: "5秒", 10: "10秒", 15: "15秒", 30: "30秒", 60: "1分钟"}.get(
-            step, "%d秒" % step
-        )
+        kind = meta.get("kind") or "intraday"
+        if kind == "daily":
+            period_text = "日线"
+            period_tag = "day"
+        else:
+            period_text = {
+                1: "1秒", 5: "5秒", 10: "10秒", 15: "15秒", 30: "30秒", 60: "1分钟",
+            }.get(step, "%d秒" % step)
+            period_tag = "%ss" % step
         symbol = (meta.get("symbol") or "").strip() or "当前图"
         safe_symbol = re.sub(r'[\\/:*?"<>|]', "_", symbol)
 
         tmp_dir = os.path.join(tempfile.gettempdir(), "tdx_live")
         os.makedirs(tmp_dir, exist_ok=True)
-        txt_path = os.path.join(tmp_dir, "%s_%ss.txt" % (safe_symbol, step))
+        txt_path = os.path.join(tmp_dir, "%s_%s.txt" % (safe_symbol, period_tag))
         try:
-            tdx_write_txt(txt_path, bars, title="%s (%s)" % (symbol, period_text))
+            tdx_write_txt(txt_path, bars, title="%s (%s，%s)" % (symbol, period_text, terminal_name))
             begin_time = tdx_ref_begin_time(bars)
         except Exception as e:
             QMessageBox.warning(self, "读取失败", "写出临时TXT失败：\n%s" % e)
@@ -758,15 +796,19 @@ class AkshareGUI(QMainWindow):
 
         first, last = meta["first"], meta["last"]
         self.code_input.setText(symbol)
-        self.statusBar.showMessage(
-            "已从通达信读取 %d 根 %s K线（%s，%04d-%02d-%02d %02d:%02d → %04d-%02d-%02d %02d:%02d），开始分析..."
-            % (
-                len(bars),
-                period_text,
-                symbol,
+        if kind == "daily":
+            range_text = "%04d-%02d-%02d → %04d-%02d-%02d" % (
+                first.date.year, first.date.month, first.date.day,
+                last.date.year, last.date.month, last.date.day,
+            )
+        else:
+            range_text = "%04d-%02d-%02d %02d:%02d → %04d-%02d-%02d %02d:%02d" % (
                 first.date.year, first.date.month, first.date.day, first.hour, first.minute,
                 last.date.year, last.date.month, last.date.day, last.hour, last.minute,
             )
+        self.statusBar.showMessage(
+            "已从%s读取 %d 根 %s K线（%s，%s），开始分析..."
+            % (terminal_name, len(bars), period_text, symbol, range_text)
         )
 
         self.analyze_btn.setEnabled(False)
@@ -901,13 +943,23 @@ class AkshareGUI(QMainWindow):
         if ok:
             self._flash_btn_text(self.copy_btn, "已复制 ✓")
 
+    def _is_daily_chan(self):
+        """当前分析级别是否为日线（日线用纯 DATE 定位，不需要 TIME）。"""
+        try:
+            return self.chan is not None and self.chan[0].kl_type == KL_TYPE.K_DAY
+        except Exception:
+            return False
+
     def _tdx_poly_cond(self, klu, map_period):
         """折线版定位条件：返回 (date_val, hour, minute)。
 
         把 K 线时间按"结束时刻"向上取整到目标周期的整点（与 DRAWLINE 映射版口径一致）。
+        日线返回 (date_val, -1, -1)，表示只用 DATE 定位（日线每天只有一根K线）。
         """
         t = klu.time
         date_val = 1000000 + (t.year % 100) * 10000 + t.month * 100 + t.day
+        if self._is_daily_chan():
+            return date_val, -1, -1
         sec = t.hour * 3600 + t.minute * 60 + (getattr(t, 'second', 0) or 0)
         period_sec = max(int(map_period), 1) * 60
         label_sec = sec if sec % period_sec == 0 else ((sec // period_sec) + 1) * period_sec
@@ -919,6 +971,9 @@ class AkshareGUI(QMainWindow):
     def _tdx_poly_cond_str(cond):
         """把 (date_val, hour, minute) 拼成通达信定位条件字符串。"""
         date_val, hour, minute = cond
+        if hour == -1:
+            # 日线：只用 DATE 定位
+            return f"DATE={date_val}"
         if hour == 0 and minute == 0:
             return f"DATE={date_val} AND TIME=0"
         return f"DATE={date_val} AND TIME={hour * 100 + minute}"
@@ -946,6 +1001,10 @@ class AkshareGUI(QMainWindow):
                 data = self.map_period_combo.currentData()
                 if data:
                     period = int(data)
+            # 日线图表不适用"映射到分钟周期"：直接按 DATE 定位（每天一根K线）
+            daily = self._is_daily_chan()
+            if daily:
+                period = None
 
             kl_list = self.chan[0]
             seg_list = kl_list.seg_list
@@ -1015,15 +1074,24 @@ class AkshareGUI(QMainWindow):
 
             lines = []
             lines.append("{缠论线段折线版 - 由 chan.py 自动生成}")
-            lines.append(
-                f"{{股票: {self.chan.code}  线段数: {len(seg_list)}  "
-                f"顶点数: {len(vertices)}  映射周期: {int(period)}分钟}}"
-            )
+            if daily:
+                lines.append(
+                    f"{{股票: {self.chan.code}  线段数: {len(seg_list)}  "
+                    f"顶点数: {len(vertices)}  周期: 日线}}"
+                )
+            else:
+                lines.append(
+                    f"{{股票: {self.chan.code}  线段数: {len(seg_list)}  "
+                    f"顶点数: {len(vertices)}  映射周期: {int(period)}分钟}}"
+                )
             lines.append("{导入方法: 通达信 -> 功能 -> 公式系统 -> 公式管理器 -> 新建 -> 技术指标公式}")
-            lines.append(
-                f"{{重要: 本文件是 {int(period)} 分钟映射版本，"
-                f"请贴在 {int(period)} 分钟K线图上，不要贴在当前级别图上}}"
-            )
+            if daily:
+                lines.append("{重要: 本文件按日线定位（只用 DATE=日期），请贴在日线图上}")
+            else:
+                lines.append(
+                    f"{{重要: 本文件是 {int(period)} 分钟映射版本，"
+                    f"请贴在 {int(period)} 分钟K线图上，不要贴在当前级别图上}}"
+                )
             lines.append("{说明: 全部线段用一条 PLOYLINE 折线画出（黄色）；末尾的未确定线段用红色短线覆盖}")
             lines.append("{说明: 通达信每条折线的最后一折会向后延伸成射线；本文件只有1~2条折线，最后顶点在最新K线上，故看不到射线}")
             lines.append("{说明: 期货夜盘K线的日期用交易日标注，与通达信一致，无需改动}")
@@ -1058,16 +1126,27 @@ class AkshareGUI(QMainWindow):
 
             if copy_only:
                 QApplication.clipboard().setText(content)
-                self.statusBar.showMessage(
-                    f"已复制通达信折线版公式到剪贴板（{int(period)}分钟映射，"
-                    f"{len(seg_list)}条线段/{len(vertices)}个顶点），到公式编辑器 Ctrl+V 粘贴"
-                )
+                if daily:
+                    self.statusBar.showMessage(
+                        f"已复制通达信折线版公式到剪贴板（日线，"
+                        f"{len(seg_list)}条线段/{len(vertices)}个顶点），到公式编辑器 Ctrl+V 粘贴"
+                    )
+                else:
+                    self.statusBar.showMessage(
+                        f"已复制通达信折线版公式到剪贴板（{int(period)}分钟映射，"
+                        f"{len(seg_list)}条线段/{len(vertices)}个顶点），到公式编辑器 Ctrl+V 粘贴"
+                    )
                 return True
 
-            default_name = f"chan_seg_{self.chan.code}_{int(period)}m_polyline.tni"
+            if daily:
+                default_name = f"chan_seg_{self.chan.code}_day_polyline.tni"
+                dlg_title = "保存通达信折线版公式(日线)"
+            else:
+                default_name = f"chan_seg_{self.chan.code}_{int(period)}m_polyline.tni"
+                dlg_title = f"保存通达信折线版公式({int(period)}分钟映射)"
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
-                f"保存通达信折线版公式({int(period)}分钟映射)",
+                dlg_title,
                 default_name,
                 "通达信公式文件 (*.tni);;文本文件 (*.txt);;所有文件 (*.*)",
             )
@@ -1077,18 +1156,28 @@ class AkshareGUI(QMainWindow):
             with open(file_path, 'w', encoding='gbk', errors='ignore') as f:
                 f.write(content)
 
-            self.statusBar.showMessage(
-                f'已导出通达信折线版公式({int(period)}分钟映射): {file_path} '
-                f'({len(seg_list)}条线段/{len(vertices)}个顶点，请贴在{int(period)}分钟图上)'
-            )
+            if daily:
+                self.statusBar.showMessage(
+                    f'已导出通达信折线版公式(日线): {file_path} '
+                    f'({len(seg_list)}条线段/{len(vertices)}个顶点，请贴在日线图上)'
+                )
+            else:
+                self.statusBar.showMessage(
+                    f'已导出通达信折线版公式({int(period)}分钟映射): {file_path} '
+                    f'({len(seg_list)}条线段/{len(vertices)}个顶点，请贴在{int(period)}分钟图上)'
+                )
 
+            if daily:
+                note = "这是日线折线版，请把公式贴到日线图上。\n"
+            else:
+                note = f"这是 {int(period)} 分钟折线版，请把公式贴到 {int(period)} 分钟K线图上。\n"
             reply = QMessageBox.question(
                 self,
                 "导出成功",
                 (
                     f"已导出 {len(seg_list)} 条线段（{len(vertices)} 个顶点）到:\n{file_path}\n\n"
-                    f"这是 {int(period)} 分钟折线版，请把公式贴到 {int(period)} 分钟K线图上。\n"
-                    f"黄色=全部线段，红色=末尾未确定线段。\n\n"
+                    + note
+                    + "黄色=全部线段，红色=末尾未确定线段。\n\n"
                     "是否立即打开该通达信公式文件？"
                 ),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -1160,6 +1249,9 @@ class AkshareGUI(QMainWindow):
                 if klc.lst
             )
 
+            # 日线：每根K线每天唯一，直接用 DATE 定位（不带 TIME）
+            daily = self._is_daily_chan()
+
             def _ceil_to_period_label(t, period_min):
                 """把时刻向上取整到目标周期的整点（以结束时刻标注）。
 
@@ -1190,6 +1282,9 @@ class AkshareGUI(QMainWindow):
                 t = klu.time
                 # 通达信 DATE 返回 1YYMMDD（7位）：1000000 + (年份后两位)*10000 + 月*100 + 日
                 date_val = 1000000 + (t.year % 100) * 10000 + t.month * 100 + t.day  # 1YYMMDD
+                if daily:
+                    # 日线：一天只有一根K线，DATE 即可唯一定位（不带 TIME）
+                    return f"DATE={date_val}"
                 if map_period:
                     # 映射模式：把端点时间映射到目标周期K线的"结束时刻"上。
                     # 日期保持不变：通达信期货夜盘K线的日期本身就是交易日口径
@@ -1222,7 +1317,11 @@ class AkshareGUI(QMainWindow):
             # 注意：通达信公式注释使用大括号 {}，不能用 // 或 # 注释
             lines = []
             lines.append("{缠论线段划分 - 由 chan.py 自动生成}")
-            if map_period:
+            if daily:
+                lines.append(
+                    f"{{股票: {self.chan.code}  线段数: {len(seg_list)}  周期: 日线}}"
+                )
+            elif map_period:
                 lines.append(
                     f"{{股票: {self.chan.code}  线段数: {len(seg_list)}  "
                     f"映射周期: {int(map_period)}分钟}}"
@@ -1230,7 +1329,9 @@ class AkshareGUI(QMainWindow):
             else:
                 lines.append(f"{{股票: {self.chan.code}  线段数: {len(seg_list)}}}")
             lines.append("{导入方法: 通达信 -> 功能 -> 公式系统 -> 公式管理器 -> 新建 -> 技术指标公式}")
-            if map_period:
+            if daily:
+                lines.append("{重要: 本文件按日线定位（只用 DATE=日期），请贴在日线图上}")
+            elif map_period:
                 lines.append(
                     f"{{重要: 本文件是 {int(map_period)} 分钟映射版本，"
                     f"请贴在 {int(map_period)} 分钟K线图上，不要贴在当前级别图上}}"
@@ -1290,7 +1391,12 @@ class AkshareGUI(QMainWindow):
 
             if copy_only:
                 QApplication.clipboard().setText(content)
-                if map_period:
+                if daily:
+                    self.statusBar.showMessage(
+                        f"已复制通达信公式到剪贴板（日线版，{len(seg_list)}条线段），"
+                        "到公式编辑器 Ctrl+V 粘贴"
+                    )
+                elif map_period:
                     self.statusBar.showMessage(
                         f"已复制通达信公式到剪贴板（{int(map_period)}分钟映射版，"
                         f"{len(seg_list)}条线段），到公式编辑器 Ctrl+V 粘贴"
@@ -1303,7 +1409,10 @@ class AkshareGUI(QMainWindow):
                 return True
 
             # 选择保存路径
-            if map_period:
+            if daily:
+                default_name = f"chan_seg_{self.chan.code}_day.tni"
+                dlg_title = "保存通达信线段公式(日线)"
+            elif map_period:
                 default_name = f"chan_seg_{self.chan.code}_{int(map_period)}m.tni"
                 dlg_title = f"保存通达信线段公式({int(map_period)}分钟映射)"
             else:
@@ -1322,7 +1431,11 @@ class AkshareGUI(QMainWindow):
             with open(file_path, 'w', encoding='gbk', errors='ignore') as f:
                 f.write(content)
 
-            if map_period:
+            if daily:
+                self.statusBar.showMessage(
+                    f'已导出通达信线段公式(日线): {file_path} ({len(seg_list)}条线段，请贴在日线图上)'
+                )
+            elif map_period:
                 self.statusBar.showMessage(
                     f'已导出通达信线段公式({int(map_period)}分钟映射): {file_path} '
                     f'({len(seg_list)}条线段，请贴在{int(map_period)}分钟图上)'
@@ -1337,8 +1450,11 @@ class AkshareGUI(QMainWindow):
                 (
                     f"已导出 {len(seg_list)} 条线段到:\n{file_path}\n\n"
                     + (
-                        f"这是 {int(map_period)} 分钟映射版本，请把公式贴到 {int(map_period)} 分钟K线图上。\n\n"
-                        if map_period else ""
+                        "这是日线版本，请把公式贴到日线图上。\n\n"
+                        if daily else (
+                            f"这是 {int(map_period)} 分钟映射版本，请把公式贴到 {int(map_period)} 分钟K线图上。\n\n"
+                            if map_period else ""
+                        )
                     )
                     + "是否立即打开该通达信公式文件？"
                 ),
