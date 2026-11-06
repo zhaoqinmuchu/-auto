@@ -429,6 +429,9 @@ class AkshareGUI(QMainWindow):
         return CChanConfig({
             "bi_strict": False,  # 固定新笔（非严格模式），不提供新旧笔切换
             "bi_fx_check": "half",  # 分型有效性校验方式（half 更符合缠论原文，避免 strict 过度过滤）
+            # 笔尾极值约束（原文没有这条）：开启时若笔内出现过"无法成笔的分型极值"（如跳空/急跌造成的
+            # 顶底过近极值），后续所有合格分型都会被判 False，笔链会永久停止推进（AUL9 2026-11-06 午休后即如此）。
+            "bi_end_is_peak": False,
             "trigger_step": False,  # 不启用逐步触发模式
             "skip_step": 0,
             "divergence_rate": float("inf"),  # 背驰比率
