@@ -84,8 +84,10 @@ python -m zipfile -e .\.local-backups\2026-11-06-baseline\chan.py-main-full.zip 
 
 ```powershell
 git bundle verify .\.local-backups\ChanScanner-history-2026-11-06.bundle
-git clone .\.local-backups\ChanScanner-history-2026-11-06.bundle .\.local-backups\manual-source-restore-new
+git clone --config core.autocrlf=false .\.local-backups\ChanScanner-history-2026-11-06.bundle .\.local-backups\manual-source-restore-new
 ```
+
+恢复命令显式设置 `core.autocrlf=false`，避免本机全局 Git 配置将原始 LF 换行转换为 CRLF，影响逐字节校验。若仓库已经用其他命令恢复，先在该新仓库内执行 `git config --local core.autocrlf false`。
 
 要查看初始源码，可在**新恢复的仓库**内使用 `git switch --detach baseline-2026-11-06`。要恢复整理版，则使用 `organized-2026-11-06`。不要在有未提交修改的日常工作目录里执行覆盖性恢复操作。
 
