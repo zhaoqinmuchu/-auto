@@ -968,6 +968,121 @@ class AkshareGUI(QMainWindow):
             return f"DATE={date_val} AND TIME=0"
         return f"DATE={date_val} AND TIME={hour * 100 + minute}"
 
+    @staticmethod
+    def _klu_is_session_start(klu):
+        """判断该 K 线是否为某个交易时段的"会话首根"（与上一根间隔超过 5 分钟）。
+
+        股票：09:30、13:00；期货：21:00、09:00、10:30、13:30 等。
+        夜盘跨零点时段（如 23:59:55 → 00:00:00）按 24 小时取模处理。
+        """
+        pre = getattr(klu, "pre", None)
+        if pre is None:
+            return False
+        t, pt = klu.time, getattr(pre, "time", None)
+        if pt is None:
+            return False
+        sec = t.hour * 3600 + t.minute * 60 + (getattr(t, "second", 0) or 0)
+        psec = pt.hour * 3600 + pt.minute * 60 + (getattr(pt, "second", 0) or 0)
+        delta = sec - psec
+        if delta < 0:
+            delta += 86400
+        return delta > 300
+
+    def _map_klu_label(self, klu, map_period):
+        """把 K 线时间映射到目标周期 K 线的标签，返回 (date_val, label_sec)。
+
+        规则（通达信分钟K线标签 = "结束时刻"）：
+          1) 常规：向上取整到目标周期（10:38:40 → 10:40 那根）；
+          2) 会话首根：通达信把会话开盘那根自身当标签（如 13:00:00、09:30:00），
+             而它实际属于下一根目标周期 K 线（13:00:00 → 13:05、09:30:00 → 09:35），
+             否则会映射到 5 分钟图上不存在的标签（13:00/09:30），线就画不出来。
+        map_period=None 表示日线：返回 (date_val, -1)，只用 DATE 定位。
+        """
+        t = klu.time
+        date_val = 1000000 + (t.year % 100) * 10000 + t.month * 100 + t.day
+        if not map_period:
+            return date_val, -1
+        period_sec = max(int(map_period), 1) * 60
+        sec = t.hour * 3600 + t.minute * 60 + (getattr(t, "second", 0) or 0)
+        if sec % period_sec == 0 and self._klu_is_session_start(klu):
+            sec += period_sec
+        label_sec = sec if sec % period_sec == 0 else ((sec // period_sec) + 1) * period_sec
+        return date_val, label_sec % 86400
+
+    @staticmethod
+    def _label_cond_str(date_val, label_sec):
+        """把 (date_val, label_sec) 拼成通达信定位条件字符串；label_sec<0 表示只用 DATE。"""
+        if label_sec is None or label_sec < 0:
+            return f"DATE={date_val}"
+        hour = label_sec // 3600
+        minute = (label_sec % 3600) // 60
+        if hour == 0 and minute == 0:
+            return f"DATE={date_val} AND TIME=0"
+        return f"DATE={date_val} AND TIME={hour * 100 + minute}"
+
+    def _mapped_seg_endpoints(self, map_period):
+        """返回每条线段映射到目标周期后的端点：
+        [(begin_cond, begin_price, end_cond, end_price), ...]，cond=(date_val, label_sec)。
+
+        除常规取整外还处理两类跨周期问题：
+          - 会话首根归属下一根目标 K 线（见 _map_klu_label）；
+          - 相邻顶点落进同一根目标 K 线：把较早的顶点回退一个周期（若仍大于更前
+            一个顶点），否则把较晚的顶点前进一个周期，避免线段长度为 0 画不出来。
+        """
+        segs = self.chan[0].seg_list
+        verts = []
+        for seg in segs:
+            for klu, price in (
+                (seg.start_bi.get_begin_klu(), seg.start_bi.get_begin_val()),
+                (seg.end_bi.get_end_klu(), seg.end_bi.get_end_val()),
+            ):
+                if verts and verts[-1][0] is klu:
+                    continue
+                verts.append((klu, price))
+        mapped = []
+        for klu, price in verts:
+            date_val, label_sec = self._map_klu_label(klu, map_period)
+            mapped.append([date_val, label_sec, price])
+        if map_period:
+            period_sec = max(int(map_period), 1) * 60
+            for i in range(1, len(mapped)):
+                if mapped[i][0] != mapped[i - 1][0] or mapped[i][1] != mapped[i - 1][1]:
+                    continue
+                if mapped[i][2] == mapped[i - 1][2]:
+                    # 价格相同：同一根K线的共享端点，不算退化
+                    continue
+                back = mapped[i - 1][1] - period_sec
+                prevprev = mapped[i - 2] if i >= 2 else None
+                if back >= 0 and (
+                    prevprev is None
+                    or prevprev[0] != mapped[i - 1][0]
+                    or back > prevprev[1]
+                ):
+                    mapped[i - 1][1] = back
+                else:
+                    mapped[i][1] = (mapped[i][1] + period_sec) % 86400
+        pos = {id(klu): i for i, (klu, _price) in enumerate(verts)}
+
+        def _cond_at(klu):
+            idx = pos.get(id(klu))
+            if idx is not None:
+                return (mapped[idx][0], mapped[idx][1]), mapped[idx][2]
+            date_val, label_sec = self._map_klu_label(klu, map_period)
+            return (date_val, label_sec), None
+
+        result = []
+        for seg in segs:
+            b_klu = seg.start_bi.get_begin_klu()
+            e_klu = seg.end_bi.get_end_klu()
+            b_cond, b_price = _cond_at(b_klu)
+            e_cond, e_price = _cond_at(e_klu)
+            if b_price is None:
+                b_price = seg.start_bi.get_begin_val()
+            if e_price is None:
+                e_price = seg.end_bi.get_end_val()
+            result.append((b_cond, b_price, e_cond, e_price))
+        return result
+
     def export_tdx_polyline_formula(self, copy_only=False):
         """折线版导出：用一条 PLOYLINE 画出全部线段（可选叠加红色未确定末段）。
 
@@ -1002,17 +1117,12 @@ class AkshareGUI(QMainWindow):
                 QMessageBox.warning(self, "警告", "当前没有划分出线段，无法导出")
                 return False
 
-            # 1) 收集线段端点（起点、终点交替）
+            # 1) 收集线段端点（起点、终点交替），并按目标周期映射（含会话首根/退化处理）
+            seg_pts = self._mapped_seg_endpoints(period)
             raw_pts = []  # (cond, price)
-            for seg in seg_list:
-                raw_pts.append((
-                    self._tdx_poly_cond(seg.start_bi.get_begin_klu(), period),
-                    seg.start_bi.get_begin_val(),
-                ))
-                raw_pts.append((
-                    self._tdx_poly_cond(seg.end_bi.get_end_klu(), period),
-                    seg.end_bi.get_end_val(),
-                ))
+            for b_cond, b_price, e_cond, e_price in seg_pts:
+                raw_pts.append((b_cond, b_price))
+                raw_pts.append((e_cond, e_price))
 
             # 2) 相邻同一根目标周期K线的点合并（线段可能被压缩到同一根K线内），保留靠后的点
             vertices = []
@@ -1030,15 +1140,11 @@ class AkshareGUI(QMainWindow):
                 tail_start = i
             tail_pts = []
             if tail_start < len(seg_list):
-                tail_pts.append((
-                    self._tdx_poly_cond(seg_list[tail_start].start_bi.get_begin_klu(), period),
-                    seg_list[tail_start].start_bi.get_begin_val(),
-                ))
-                for seg in seg_list[tail_start:]:
-                    tail_pts.append((
-                        self._tdx_poly_cond(seg.end_bi.get_end_klu(), period),
-                        seg.end_bi.get_end_val(),
-                    ))
+                b_cond, b_price, _b_cond2, _b_price2 = seg_pts[tail_start]
+                tail_pts.append((b_cond, b_price))
+                for i in range(tail_start, len(seg_pts)):
+                    _e_bcond, _e_bprice, e_cond, e_price = seg_pts[i]
+                    tail_pts.append((e_cond, e_price))
                 dedup = []
                 for cond, price in tail_pts:
                     if dedup and dedup[-1][0] == cond:
@@ -1093,7 +1199,7 @@ class AkshareGUI(QMainWindow):
                 for i, (cond, price) in enumerate(pts, 1):
                     name = f"{prefix}{i}"
                     names.append(name)
-                    out_lines.append(f"{name}:=IF({self._tdx_poly_cond_str(cond)},{price:.2f},0);")
+                    out_lines.append(f"{name}:=IF({self._label_cond_str(cond[0], cond[1])},{price:.2f},0);")
                 group_names = []
                 for gi in range(0, len(names), 25):
                     gname = f"{prefix}G{len(group_names) + 1}"
@@ -1242,6 +1348,12 @@ class AkshareGUI(QMainWindow):
             # 日线：每根K线每天唯一，直接用 DATE 定位（不带 TIME）
             daily = self._is_daily_chan()
 
+            # 映射模式：预先算好每条线段端点映射到的目标周期标签
+            # （含"会话首根"与"相邻顶点压进同一根K线"的处理）
+            mapped_seg_pts = None
+            if map_period and not daily:
+                mapped_seg_pts = self._mapped_seg_endpoints(int(map_period))
+
             def _ceil_to_period_label(t, period_min):
                 """把时刻向上取整到目标周期的整点（以结束时刻标注）。
 
@@ -1348,13 +1460,18 @@ class AkshareGUI(QMainWindow):
             # 每条语句很短，不会产生超长嵌套表达式，导出快速不卡死。
             sure_lines = []
             unsure_lines = []
-            for seg in seg_list:
-                begin_klu = seg.start_bi.get_begin_klu()
-                begin_price = seg.start_bi.get_begin_val()
-                end_klu = seg.end_bi.get_end_klu()
-                end_price = seg.end_bi.get_end_val()
-                begin_cond = _make_time_cond(begin_klu)
-                end_cond = _make_time_cond(end_klu)
+            for si, seg in enumerate(seg_list):
+                if mapped_seg_pts is not None:
+                    b_cond, begin_price, e_cond, end_price = mapped_seg_pts[si]
+                    begin_cond = self._label_cond_str(b_cond[0], b_cond[1])
+                    end_cond = self._label_cond_str(e_cond[0], e_cond[1])
+                else:
+                    begin_klu = seg.start_bi.get_begin_klu()
+                    begin_price = seg.start_bi.get_begin_val()
+                    end_klu = seg.end_bi.get_end_klu()
+                    end_price = seg.end_bi.get_end_val()
+                    begin_cond = _make_time_cond(begin_klu)
+                    end_cond = _make_time_cond(end_klu)
                 # 所有线段统一：粗细=1，颜色=黄色
                 # 通达信绘图函数后可用 ,COLORxxx 和 ,LINETHICKn 指定颜色与粗细
                 drawline = (
