@@ -1,0 +1,5 @@
+# Candidate build versions found in the legacy Python 3.13 environment metadata.
+# Not installed or rebuilt as part of the 2026-11-06 organization work.
+-r requirements-gui.txt
+PyInstaller==6.22.3
+pyinstaller-hooks-contrib==2026.8

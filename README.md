@@ -1,3 +1,6 @@
+> **本机 ChanScanner 定制项目：请先阅读 [中文项目指南](PROJECT_GUIDE.md)。**
+> 下文保留上游框架原说明，其中完整版能力不等于本目录已经实现的功能。
+
 <p align="center">
 <img src="./Image/chan.py_image_1.svg" width="300"/>
 </p>
