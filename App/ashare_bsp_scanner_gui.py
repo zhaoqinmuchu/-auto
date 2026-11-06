@@ -386,6 +386,42 @@ class AkshareGUI(QMainWindow):
         export_hint.setStyleSheet("color: #888888; font-size: 11px;")
         single_layout.addWidget(export_hint)
 
+        # 按目标周期映射导出（如 10 秒级别画出来的线段，映射到 5 分钟 K 线上）
+        map_period_row = QHBoxLayout()
+        map_period_row.addWidget(QLabel("映射周期:"))
+        self.map_period_combo = QComboBox()
+        for minutes in (5, 1, 15, 30, 60):
+            self.map_period_combo.addItem(f"{minutes}分钟", minutes)
+        map_period_row.addWidget(self.map_period_combo)
+        single_layout.addLayout(map_period_row)
+
+        map_export_row = QHBoxLayout()
+        self.map_export_btn = QPushButton("导出5分钟映射公式")
+        self.map_export_btn.clicked.connect(self.export_tdx_seg_formula_mapped)
+        self.map_export_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #8E24AA;
+                color: white;
+                font-size: 13px;
+                padding: 8px;
+                border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #6A1B9A; }
+        """)
+        map_export_row.addWidget(self.map_export_btn)
+        single_layout.addLayout(map_export_row)
+
+        map_hint = QLabel(
+            "把当前级别画出的线段，按时间映射到大周期K线上（如10秒线段→5分钟图）；"
+            "坐标按目标周期的K线定位，价格不变"
+        )
+        map_hint.setWordWrap(True)
+        map_hint.setStyleSheet("color: #888888; font-size: 11px;")
+        single_layout.addWidget(map_hint)
+
+        self.map_period_combo.currentIndexChanged.connect(self._update_map_period_hint)
+        self._update_map_period_hint()
+
         layout.addWidget(single_group)
 
         layout.addStretch()
@@ -630,8 +666,40 @@ class AkshareGUI(QMainWindow):
         self.statusBar.showMessage('分析失败')
 
     def export_tdx_seg_formula(self):
+        """导出与当前数据周期一致的线段公式（原有按钮，行为不变）。"""
+        self._export_tdx_seg_formula_impl(None)
+
+    def export_tdx_seg_formula_mapped(self):
+        """把当前线段按时间映射到目标周期（默认 5 分钟）后导出。"""
+        period = 5
+        if hasattr(self, "map_period_combo"):
+            data = self.map_period_combo.currentData()
+            if data:
+                period = int(data)
+        self._export_tdx_seg_formula_impl(period)
+
+    def _update_map_period_hint(self):
+        """映射周期下拉变化时，同步更新按钮文字。"""
+        period = 5
+        if hasattr(self, "map_period_combo"):
+            data = self.map_period_combo.currentData()
+            if data:
+                period = int(data)
+        if hasattr(self, "map_export_btn"):
+            self.map_export_btn.setText(f"导出{period}分钟映射公式")
+
+    def _export_tdx_seg_formula_impl(self, map_period=None):
         """
         将当前分析的线段划分导出为通达信公式文件(.tni)。
+
+        参数 map_period：为 None 时按当前数据周期导出（原行为）；
+        传入目标周期（分钟）时，把每个端点按时间映射到目标周期的K线上，
+        例如 10 秒数据算出的线段，映射到 5 分钟后可以贴在 5 分钟K线图上。
+        映射口径（已与通达信实际数据核对）：
+          - 通达信分钟K线以"结束时刻"标注：21:00:10 属于 21:05 那根；
+          - 期货夜盘的K线日期用"交易日"标注（如 11/06 21:05 那根，DATE=11/09），
+            与从通达信导出的 TXT 中的日期口径一致，因此映射时保留原 K 线日期不变；
+          - 端点时间正好落在目标周期整点上（秒=0、分能被周期整除）时，就取该整点。
 
         通达信公式使用 DRAWLINE 函数在K线图上画线段：
             DRAWLINE(COND1, PRICE1, COND2, PRICE2, EXPAND)
@@ -676,6 +744,23 @@ class AkshareGUI(QMainWindow):
                 if klc.lst
             )
 
+            def _ceil_to_period_label(t, period_min):
+                """把时刻向上取整到目标周期的整点（以结束时刻标注）。
+
+                例：10 秒数据 11:03:30 → 5 分钟周期的 11:05 那根K线；
+                正好落在整点（秒=0 且分能被周期整除）时就用该整点本身，
+                因为通达信分钟K线标注的是结束时刻（21:00:10 属于 21:05 那根）。
+
+                返回 (hour, minute)；若跨过 24:00，则时间回到 00:00，
+                日期保持原交易日不变（期货夜盘K线的日期用交易日标注）。
+                """
+                sec = t.hour * 3600 + t.minute * 60 + (getattr(t, 'second', 0) or 0)
+                period_sec = period_min * 60
+                label_sec = sec if sec % period_sec == 0 else ((sec // period_sec) + 1) * period_sec
+                if label_sec >= 86400:
+                    label_sec -= 86400
+                return label_sec // 3600, (label_sec % 3600) // 60
+
             def _make_time_cond(klu):
                 """根据K线时间生成通达信定位条件
 
@@ -689,6 +774,14 @@ class AkshareGUI(QMainWindow):
                 t = klu.time
                 # 通达信 DATE 返回 1YYMMDD（7位）：1000000 + (年份后两位)*10000 + 月*100 + 日
                 date_val = 1000000 + (t.year % 100) * 10000 + t.month * 100 + t.day  # 1YYMMDD
+                if map_period:
+                    # 映射模式：把端点时间映射到目标周期K线的"结束时刻"上。
+                    # 日期保持不变：通达信期货夜盘K线的日期本身就是交易日口径
+                    # （如 11/06 21:05 的夜盘K线，DATE 是 11/09），与导出的 TXT 一致。
+                    hour, minute = _ceil_to_period_label(t, int(map_period))
+                    if hour == 0 and minute == 0:
+                        return f"DATE={date_val} AND TIME=0"
+                    return f"DATE={date_val} AND TIME={hour * 100 + minute}"
                 # 注意：必须先判断秒级K线，再判断"时=0分=0"的日线分支。
                 # 因为秒级K线在 00:00:50（时=0、分=0）时也会满足 hour==0 and minute==0，
                 # 若先走日线分支会漏掉 TIME2，导致通达信定位到错误K线。
@@ -713,9 +806,26 @@ class AkshareGUI(QMainWindow):
             # 注意：通达信公式注释使用大括号 {}，不能用 // 或 # 注释
             lines = []
             lines.append("{缠论线段划分 - 由 chan.py 自动生成}")
-            lines.append(f"{{股票: {self.chan.code}  线段数: {len(seg_list)}}}")
+            if map_period:
+                lines.append(
+                    f"{{股票: {self.chan.code}  线段数: {len(seg_list)}  "
+                    f"映射周期: {int(map_period)}分钟}}"
+                )
+            else:
+                lines.append(f"{{股票: {self.chan.code}  线段数: {len(seg_list)}}}")
             lines.append("{导入方法: 通达信 -> 功能 -> 公式系统 -> 公式管理器 -> 新建 -> 技术指标公式}")
-            lines.append("{将以下内容粘贴到公式编辑器中，然后应用到对应K线周期即可}")
+            if map_period:
+                lines.append(
+                    f"{{重要: 本文件是 {int(map_period)} 分钟映射版本，"
+                    f"请贴在 {int(map_period)} 分钟K线图上，不要贴在当前级别图上}}"
+                )
+                lines.append(
+                    f"{{说明: 线段来自更小级别数据的笔/线段，端点时间按"
+                    f"\"结束时刻\"映射到 {int(map_period)} 分钟K线，价格不变}}"
+                )
+                lines.append("{说明: 期货夜盘K线的日期用交易日标注，与通达信一致，无需改动}")
+            else:
+                lines.append("{将以下内容粘贴到公式编辑器中，然后应用到对应K线周期即可}")
             lines.append("")
             lines.append("{说明: 用时间(DATE/TIME)定位K线，不用序号，缩放不偏移}")
             lines.append("{DATE 返回当前K线日期(1YYMMDD)，TIME 返回当前K线时间(HHMM)}")
@@ -763,10 +873,15 @@ class AkshareGUI(QMainWindow):
             content = "\n".join(lines) + "\n"
 
             # 选择保存路径
-            default_name = f"chan_seg_{self.chan.code}.tni"
+            if map_period:
+                default_name = f"chan_seg_{self.chan.code}_{int(map_period)}m.tni"
+                dlg_title = f"保存通达信线段公式({int(map_period)}分钟映射)"
+            else:
+                default_name = f"chan_seg_{self.chan.code}.tni"
+                dlg_title = "保存通达信线段公式"
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
-                "保存通达信线段公式",
+                dlg_title,
                 default_name,
                 "通达信公式文件 (*.tni);;文本文件 (*.txt);;所有文件 (*.*)",
             )
@@ -777,14 +892,26 @@ class AkshareGUI(QMainWindow):
             with open(file_path, 'w', encoding='gbk', errors='ignore') as f:
                 f.write(content)
 
-            self.statusBar.showMessage(f'已导出通达信线段公式: {file_path} ({len(seg_list)}条线段)')
+            if map_period:
+                self.statusBar.showMessage(
+                    f'已导出通达信线段公式({int(map_period)}分钟映射): {file_path} '
+                    f'({len(seg_list)}条线段，请贴在{int(map_period)}分钟图上)'
+                )
+            else:
+                self.statusBar.showMessage(f'已导出通达信线段公式: {file_path} ({len(seg_list)}条线段)')
 
             # 询问是否打开导出的公式文件
             reply = QMessageBox.question(
                 self,
                 "导出成功",
-                f"已导出 {len(seg_list)} 条线段到:\n{file_path}\n\n"
-                "是否立即打开该通达信公式文件？",
+                (
+                    f"已导出 {len(seg_list)} 条线段到:\n{file_path}\n\n"
+                    + (
+                        f"这是 {int(map_period)} 分钟映射版本，请把公式贴到 {int(map_period)} 分钟K线图上。\n\n"
+                        if map_period else ""
+                    )
+                    + "是否立即打开该通达信公式文件？"
+                ),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes,
             )
