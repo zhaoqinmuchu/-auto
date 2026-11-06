@@ -447,6 +447,12 @@ class Bar:
         )
 
 
+# 通达信内部日期序号（K 线记录 +28 的 D 除以 86400）的零点：
+# dn=8339 对应 2026-10-30（黄金/原油 5 秒数据校准）；对期货，夜盘 bar 的 dn
+# 是"下一交易日"，对股票就是日历日；两者都与 TDX 显示/公式里的 DATE 一致。
+TDX_DAY_EPOCH = dt.date(2003, 12, 31)
+
+
 def decode_labels(ds: list[int] | np.ndarray, step: int) -> tuple[list[int], list[bool]]:
     """把时间键 D 解码成"当日秒数"标签；返回 (labels, flagged)。
 
@@ -520,9 +526,25 @@ def read_candidate_bars(
     for i in range(1, cnt):
         if flagged[i]:
             date_dn[i] = date_dn[i - 1]
-    anchor = infer_anchor_date(now)
     dn_last = int(date_dn[-1])
-    days_delta = date_dn - dn_last
+
+    # 日期直接用通达信内部"日期序号"换算：这样
+    #   期货：夜盘 bar 的 dn = 下一交易日（与 TDX 显示一致）；
+    #   股票：dn = 日历日；
+    # 都不再依赖"读取时刻"去猜交易日（旧逻辑在凌晨读取股票时会整体偏 3 天，
+    # 导出的公式 DATE 对不上图上 K 线 -> 贴到通达信里严重错位）。
+    dates = [TDX_DAY_EPOCH + dt.timedelta(days=int(dn)) for dn in date_dn]
+    now_dt = now or dt.datetime.now()
+    if not dates or not (
+        dt.date(2005, 1, 1) <= dates[-1] <= now_dt.date() + dt.timedelta(days=7)
+    ):
+        # 兜底：日期序号异常时退回"按读取时刻推断最后一个交易日"的老办法
+        anchor = infer_anchor_date(now)
+        days_delta = date_dn - dn_last
+        dates = [
+            anchor + dt.timedelta(days=int(days_delta[i])) for i in range(cnt)
+        ]
+    anchor = dates[-1]
 
     o = rec["O"]
     hgh = rec["H"]
@@ -534,7 +556,7 @@ def read_candidate_bars(
         sec = labels[i]
         bars.append(
             Bar(
-                date=anchor + dt.timedelta(days=int(days_delta[i])),
+                date=dates[i],
                 hour=sec // 3600,
                 minute=(sec % 3600) // 60,
                 second=sec % 60,
