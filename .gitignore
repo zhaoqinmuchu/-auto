@@ -22,3 +22,9 @@ cos_config.yaml
 /test.png
 /chan_seg_*.tni
 /chan_seg_*.txt
+
+# Local working artifacts (generated during development, not part of source)
+/.pylibs/
+/.tmp/
+/yuanwen/
+/sandbox_probe.txt
