@@ -173,15 +173,6 @@ class CChan:
         if self.data_src == DATA_SRC.BAO_STOCK:
             from DataAPI.BaoStockAPI import CBaoStock
             _dict[DATA_SRC.BAO_STOCK] = CBaoStock
-        elif self.data_src == DATA_SRC.CCXT:
-            from DataAPI.ccxt import CCXT
-            _dict[DATA_SRC.CCXT] = CCXT
-        elif self.data_src == DATA_SRC.CSV:
-            from DataAPI.csvAPI import CSV_API
-            _dict[DATA_SRC.CSV] = CSV_API
-        elif self.data_src == DATA_SRC.AKSHARE:
-            from DataAPI.AkshareAPI import CAkshare
-            _dict[DATA_SRC.AKSHARE] = CAkshare
         if self.data_src in _dict:
             return _dict[self.data_src]
         assert isinstance(self.data_src, str)
