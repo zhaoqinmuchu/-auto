@@ -500,7 +500,8 @@ class AkshareGUI(QMainWindow):
 
         live_hint = QLabel(
             "直接从通达信内存读取当前图表的K线（不用先导出文件）："
-            "左=期货通（5秒/10秒自动识别），右=华泰海通证券（日线/10秒）；"
+            "左=期货通，右=华泰海通证券；"
+            "两个按钮都会按终端当前图表的实际周期自动识别（5秒/10秒）；"
             "读哪个品种取决于对应终端当前显示的图表"
         )
         live_hint.setWordWrap(True)
@@ -772,15 +773,10 @@ class AkshareGUI(QMainWindow):
         btn.setEnabled(True)
 
         step = int(meta.get("step") or 0)
-        kind = meta.get("kind") or "intraday"
-        if kind == "daily":
-            period_text = "日线"
-            period_tag = "day"
-        else:
-            period_text = {
-                1: "1秒", 5: "5秒", 10: "10秒", 15: "15秒", 30: "30秒", 60: "1分钟",
-            }.get(step, "%d秒" % step)
-            period_tag = "%ss" % step
+        period_text = {
+            1: "1秒", 5: "5秒", 10: "10秒", 15: "15秒", 30: "30秒", 60: "1分钟",
+        }.get(step, "%d秒" % step)
+        period_tag = "%ss" % step
         symbol = (meta.get("symbol") or "").strip() or "当前图"
         safe_symbol = re.sub(r'[\\/:*?"<>|]', "_", symbol)
 
@@ -796,16 +792,10 @@ class AkshareGUI(QMainWindow):
 
         first, last = meta["first"], meta["last"]
         self.code_input.setText(symbol)
-        if kind == "daily":
-            range_text = "%04d-%02d-%02d → %04d-%02d-%02d" % (
-                first.date.year, first.date.month, first.date.day,
-                last.date.year, last.date.month, last.date.day,
-            )
-        else:
-            range_text = "%04d-%02d-%02d %02d:%02d → %04d-%02d-%02d %02d:%02d" % (
-                first.date.year, first.date.month, first.date.day, first.hour, first.minute,
-                last.date.year, last.date.month, last.date.day, last.hour, last.minute,
-            )
+        range_text = "%04d-%02d-%02d %02d:%02d → %04d-%02d-%02d %02d:%02d" % (
+            first.date.year, first.date.month, first.date.day, first.hour, first.minute,
+            last.date.year, last.date.month, last.date.day, last.hour, last.minute,
+        )
         self.statusBar.showMessage(
             "已从%s读取 %d 根 %s K线（%s，%s），开始分析..."
             % (terminal_name, len(bars), period_text, symbol, range_text)

@@ -428,36 +428,6 @@ def scan_candidates(
                             protect=protect,
                         )
                     )
-
-            # ② 日线：REC_DTYPE 视图里 D(+28) 是"下一根的日期"，
-            #    因此真实数组起点要往前挪 4 字节，段内每根 + 段后一根共 cnt+1 根。
-            md = _daily_mask(rec)
-            if int(md.sum()) >= min_count:
-                for s, e in _runs(md, min_count):
-                    real1 = base + phase + s * 32 - 4          # 本段第一根的记录起点
-                    cnt1 = (e - s) + 1                          # 含段后那根（其日期在上一根的 +28）
-                    first_buf = read_mem(h, real1, 4)
-                    last_buf = read_mem(h, real1 + (cnt1 - 1) * 32, 4)
-                    if len(first_buf) < 4 or len(last_buf) < 4:
-                        continue
-                    d0 = int(np.frombuffer(first_buf, dtype="<i4")[0])
-                    d1 = int(np.frombuffer(last_buf, dtype="<i4")[0])
-                    if not _is_date_int(d0) or not _is_date_int(d1) or d1 < d0:
-                        continue
-                    sub = rec[s:e]
-                    cands.append(
-                        Candidate(
-                            addr=real1,
-                            count=int(cnt1),
-                            step=0,
-                            firstD=d0,
-                            lastD=d1,
-                            firstC=float(sub["C"][0]),
-                            lastC=float(sub["C"][-1]),
-                            protect=protect,
-                            kind="daily",
-                        )
-                    )
     stats = {
         "regions": len(regions),
         "scanned_bytes": scanned,
@@ -531,6 +501,17 @@ def select_candidates(
         pref = [c for c in fresh if c.step == prefer_step]
         if pref:
             fresh = pref
+    # 若内存里存在"比日线明显更新"的日内数据（例如刚看过 5 秒/10 秒图），
+    # 说明当前图表多半是分钟/秒级，此时丢掉日线候选，避免把历史日线缓存
+    # 误当成"当前图表"（证券终端的日线数组通常会一直留在内存里）。
+    if intra and daily and fresh:
+        mx_daily = max(_cand_time_key(c) for c in daily)
+        if any(
+            _cand_time_key(c) > mx_daily + 86400
+            for c in fresh
+            if c.kind != "daily"
+        ):
+            fresh = [c for c in fresh if c.kind != "daily"]
     uniq: dict[tuple, Candidate] = {}
     for c in fresh:
         # 去重键要带价格：不同品种的日线数组可能根数完全相同（如都是 700 根、到同一天），
@@ -639,50 +620,6 @@ def read_candidate_bars(
     h, cand: Candidate, now: dt.datetime | None = None
 ) -> tuple[list[Bar], dict]:
     """按候选段地址读出全部 K 线并解码。"""
-    if cand.kind == "daily":
-        raw = read_mem(h, cand.addr, cand.count * 32)
-        cnt = len(raw) // 32
-        if cnt <= 0:
-            raise RuntimeError("读取日线数组失败")
-        rec = np.frombuffer(raw, dtype=DAILY_DTYPE, count=cnt)
-        dates: list[dt.date] = []
-        for i in range(cnt):
-            v = int(rec["D"][i])
-            if not _is_date_int(v):
-                raise RuntimeError(f"日线记录日期异常：{v}（addr=0x{cand.addr + i * 32:x}）")
-            y, md = divmod(v, 10000)
-            mo, dd = divmod(md, 100)
-            dates.append(dt.date(y, mo, dd))
-        bars: list[Bar] = []
-        for i in range(cnt):
-            bars.append(
-                Bar(
-                    date=dates[i],
-                    hour=0,
-                    minute=0,
-                    second=0,
-                    open=float(rec["O"][i]),
-                    high=float(rec["H"][i]),
-                    low=float(rec["L"][i]),
-                    close=float(rec["C"][i]),
-                    volume=int(rec["V"][i]),
-                    dn=0,
-                    flagged=False,
-                )
-            )
-        meta = {
-            "step": 0,
-            "kind": "daily",
-            "count": len(bars),
-            "anchor": dates[-1],
-            "addr": cand.addr,
-            "dn_last": 0,
-            "ptr_hits": cand.ptr_hits,
-            "first": bars[0],
-            "last": bars[-1],
-        }
-        return bars, meta
-
     raw = read_mem(h, cand.addr, cand.count * 32)
     cnt = len(raw) // 32
     if cnt <= 0:
