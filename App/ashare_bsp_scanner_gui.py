@@ -379,28 +379,6 @@ class AkshareGUI(QMainWindow):
         import_hint.setStyleSheet("color: #888888; font-size: 11px;")
         single_layout.addWidget(import_hint)
 
-        # 从通达信内存直接读取当前图表（免手工导出）
-        live_row = QHBoxLayout()
-        self.live_read_btn = QPushButton("读取当前图(通达信)")
-        self.live_read_btn.clicked.connect(self.read_from_tdx_live)
-        self.live_read_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #00897B;
-                color: white;
-                font-size: 13px;
-                padding: 8px;
-                border-radius: 5px;
-            }
-            QPushButton:hover { background-color: #00695C; }
-        """)
-        live_row.addWidget(self.live_read_btn)
-        single_layout.addLayout(live_row)
-
-        live_hint = QLabel("直接从通达信内存读取当前图表的K线（不用先导出文件）；需期货通已打开目标品种，自动识别5秒/10秒周期")
-        live_hint.setWordWrap(True)
-        live_hint.setStyleSheet("color: #888888; font-size: 11px;")
-        single_layout.addWidget(live_hint)
-
         # 导出通达信线段公式
         export_row = QHBoxLayout()
         self.export_btn = QPushButton("导出通达信线段公式")
@@ -482,6 +460,29 @@ class AkshareGUI(QMainWindow):
         poly_hint.setWordWrap(True)
         poly_hint.setStyleSheet("color: #888888; font-size: 11px;")
         single_layout.addWidget(poly_hint)
+
+        # 从通达信内存直接读取当前图表（免手工导出）；紧挨着下面的"复制公式"按钮，
+        # 因为日常流程就是：切品种 → 读取当前图 → 复制公式 → 通达信里 Ctrl+V。
+        live_row = QHBoxLayout()
+        self.live_read_btn = QPushButton("读取当前图(通达信)")
+        self.live_read_btn.clicked.connect(self.read_from_tdx_live)
+        self.live_read_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #00897B;
+                color: white;
+                font-size: 13px;
+                padding: 8px;
+                border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #00695C; }
+        """)
+        live_row.addWidget(self.live_read_btn)
+        single_layout.addLayout(live_row)
+
+        live_hint = QLabel("直接从通达信内存读取当前图表的K线（不用先导出文件）；需期货通已打开目标品种，自动识别5秒/10秒周期")
+        live_hint.setWordWrap(True)
+        live_hint.setStyleSheet("color: #888888; font-size: 11px;")
+        single_layout.addWidget(live_hint)
 
         # 一键复制到剪贴板：不保存文件，直接粘贴到达通信用公式编辑器
         copy_row = QHBoxLayout()
