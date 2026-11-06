@@ -1,0 +1,62 @@
+{
+  "modified": {
+    "App/ashare_bsp_scanner_gui.py": {
+      "old_sha256": "b3badbcf5019527abb1a2bf99d5be9f7659076926cdfd5a7629bc000942b0eac",
+      "new_sha256": "5a495fca9bae3e6efd1a1391df5938ad2e2813243f8fa4a906c98a7ced6a6e2a",
+      "reason": "batch1：删除全市场扫描界面/线程/列表/日志与 get_tradable_stocks；移除新旧笔切换，固定 GUI 默认 bi_strict=False（其余 14 个计算参数不变）。"
+    },
+    "Chan.py": {
+      "old_sha256": "124222303ceceed0e4450f5e93e82c1b873a9222f3c3265ddbd3d90d0bb16315",
+      "new_sha256": "2f6784893c0f020a290aaacaa06779d8e009a1eef0cb1729d9a3ee29c1000d80",
+      "reason": "batch2：DATA_SRC 仅保留 BAO_STOCK 与 custom 动态数据源，删除 CCXT/CSV/AKSHARE 三个未安装且无调用方的分支。"
+    },
+    "Common/CEnum.py": {
+      "old_sha256": "f08c6a321c6b52b9156761f7aac59b287f800a5094b32a416f1d50ad419afbab",
+      "new_sha256": "e4b3e8a502d0d1edd10a1177dc96646bde6d2edb0f361978b0cbc90170447fb0",
+      "reason": "batch2：DATA_SRC 枚举仅保留 BAO_STOCK，与 Chan.py 的裁剪同步。"
+    }
+  },
+  "deleted": {
+    "DataAPI/AkshareAPI.py": "未安装 akshare 且无调用方的死数据源；随 DATA_SRC 分支一并删除。",
+    "DataAPI/ccxt.py": "未安装 ccxt 且无调用方的死数据源；随 DATA_SRC 分支一并删除。",
+    "DataAPI/csvAPI.py": "GUI 从不使用 CSV 数据源；随 DATA_SRC 分支一并删除。",
+    "Debug/debug_tdx.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/strategy_demo.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/strategy_demo2.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/strategy_demo3.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/strategy_demo4.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/strategy_demo5.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/strategy_demo6.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_000688_fix.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_baostock_chan.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_baostock_enc.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_baostock_enc2.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_baostock_list.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_get_stocks.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_0723.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_0723b.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_0723c.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_0723d.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_0723e.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_0723f.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_0723g.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_0723h.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_0723i.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_9310.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_diag.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_diag2.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_diag3.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_diag4.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_revert_fx_debug.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_seg_second_case.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_tdx_daily.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_tdx_txt.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Debug/test_tencent_kline.py": "上游/本地调试与诊断脚本（个人绝对路径、样例专用或联网硬编码）；batch2 删除，仅保留 4 个必需离线日期回归。",
+    "Plot/AnimatePlotDriver.py": "上游 IPython 动画演示，依赖未安装的 IPython，无运行路径引用。",
+    "main.py": "上游联网演示入口，非 GUI 入口；与 AnimatePlotDriver 成对删除。"
+  },
+  "added": [
+    "tools/razor_acceptance.py",
+    "tools/razor_gui_check.py"
+  ]
+}

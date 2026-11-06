@@ -1,5 +1,7 @@
 > **本机 ChanScanner 定制项目：请先阅读 [中文项目指南](PROJECT_GUIDE.md)。**
 > 下文保留上游框架原说明，其中完整版能力不等于本目录已经实现的功能。
+>
+> 本仓库当前处于「剃刀计划」分支 `codex/razor-project`：上游演示入口和示例（如 `main.py`、`strategy_demo*`、`Plot/AnimatePlotDriver.py`）已删除，下文相关链接与代码片段仅作上游历史说明，不代表本目录仍有这些文件。GUI 功能、构建与验收以 [PROJECT_GUIDE.md](PROJECT_GUIDE.md) 和 [剃刀验收记录](docs/RAZOR_ACCEPTANCE.md) 为准；上游署名与 `LICENSE` 保留。
 
 <p align="center">
 <img src="./Image/chan.py_image_1.svg" width="300"/>

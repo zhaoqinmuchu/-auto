@@ -1,3 +1,4 @@
+# pandas 由 baostock 间接必需（baostock 0.9.3 METADATA 声明 Requires-Dist: pandas>=0.18.0）；不要从本清单删除。
 baostock==0.9.3
 certifi==2026.7.22
 charset-normalizer==3.4.9

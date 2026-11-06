@@ -1,5 +1,10 @@
 # 快速上手指南
 
+> 说明：本文是上游 chan.py 框架指南，保留作历史参考，不是本仓库 ChanScanner GUI 的使用说明。
+> 剃刀版 GUI 已移除全市场扫描和界面上的新旧笔切换；`bi_strict` 仍是框架参数，但 GUI 固定为 `False`（新笔）。
+> GUI 用法见 [PROJECT_GUIDE.md](PROJECT_GUIDE.md)，剃刀验收与构建信息见 [docs/RAZOR_ACCEPTANCE.md](docs/RAZOR_ACCEPTANCE.md)。
+> 文中指向 `Debug/` 示例脚本的链接随 batch2 删除已失效，相关代码仅作上游历史参考。
+
 - [快速上手指南](#快速上手指南)
   - [写在前面](#写在前面)
   - [如何开始](#如何开始)
