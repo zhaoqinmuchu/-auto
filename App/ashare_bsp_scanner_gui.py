@@ -419,6 +419,33 @@ class AkshareGUI(QMainWindow):
         map_hint.setStyleSheet("color: #888888; font-size: 11px;")
         single_layout.addWidget(map_hint)
 
+        # 折线版导出：整条链路只用一条 PLOYLINE 画出
+        # 通达信限制：公式最多 100 个输出；每条 PLOYLINE 的"最后一折"会变成射线向后延伸。
+        # 所以把全部线段端点写进一条折线，射线只出现在最新K线之后，不可见。
+        poly_export_row = QHBoxLayout()
+        self.poly_export_btn = QPushButton("导出5分钟折线版")
+        self.poly_export_btn.clicked.connect(self.export_tdx_polyline_formula)
+        self.poly_export_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2E7D32;
+                color: white;
+                font-size: 13px;
+                padding: 8px;
+                border-radius: 5px;
+            }
+            QPushButton:hover { background-color: #1B5E20; }
+        """)
+        poly_export_row.addWidget(self.poly_export_btn)
+        single_layout.addLayout(poly_export_row)
+
+        poly_hint = QLabel(
+            "折线版：用一条折线(PLOYLINE)连起全部线段，绕开通达信"
+            "「最多100个输出」和「每条折线末尾会飞出一条射线」的限制；未确定末段用红色覆盖"
+        )
+        poly_hint.setWordWrap(True)
+        poly_hint.setStyleSheet("color: #888888; font-size: 11px;")
+        single_layout.addWidget(poly_hint)
+
         self.map_period_combo.currentIndexChanged.connect(self._update_map_period_hint)
         self._update_map_period_hint()
 
@@ -687,6 +714,201 @@ class AkshareGUI(QMainWindow):
                 period = int(data)
         if hasattr(self, "map_export_btn"):
             self.map_export_btn.setText(f"导出{period}分钟映射公式")
+        if hasattr(self, "poly_export_btn"):
+            self.poly_export_btn.setText(f"导出{period}分钟折线版")
+
+    def _tdx_poly_cond(self, klu, map_period):
+        """折线版定位条件：返回 (date_val, hour, minute)。
+
+        把 K 线时间按"结束时刻"向上取整到目标周期的整点（与 DRAWLINE 映射版口径一致）。
+        """
+        t = klu.time
+        date_val = 1000000 + (t.year % 100) * 10000 + t.month * 100 + t.day
+        sec = t.hour * 3600 + t.minute * 60 + (getattr(t, 'second', 0) or 0)
+        period_sec = max(int(map_period), 1) * 60
+        label_sec = sec if sec % period_sec == 0 else ((sec // period_sec) + 1) * period_sec
+        if label_sec >= 86400:
+            label_sec -= 86400
+        return date_val, label_sec // 3600, (label_sec % 3600) // 60
+
+    @staticmethod
+    def _tdx_poly_cond_str(cond):
+        """把 (date_val, hour, minute) 拼成通达信定位条件字符串。"""
+        date_val, hour, minute = cond
+        if hour == 0 and minute == 0:
+            return f"DATE={date_val} AND TIME=0"
+        return f"DATE={date_val} AND TIME={hour * 100 + minute}"
+
+    def export_tdx_polyline_formula(self):
+        """折线版导出：用一条 PLOYLINE 画出全部线段（可选叠加红色未确定末段）。
+
+        背景（已在通达信里实测确认）：
+          - 公式最多 100 个输出，每条 PLOYLINE 只算 1 个输出；
+          - 单条折线的顶点数不受限，但每句最多 800 个单词；
+          - **每条 PLOYLINE 的"最后一折"会变成一条射线向后无限延伸**，
+            所以把线拆成很多条时，每条末尾都会飞出一条射线（画面混乱）。
+        因此：每个线段端点写一句 `Vn:=IF(条件,价格,0)`，再分层求和成一条序列，
+        最后只画一条 PLOYLINE。整条线只有一个末尾射线，且最后一个顶点就在
+        最新K线上，射线看不见。未确定的末段再叠一条红色短线（其终点同样在
+        最右端，也不会乱飞）。
+        """
+        if not self.chan:
+            QMessageBox.warning(self, "警告", "请先分析一只股票，再导出折线版公式")
+            return
+
+        try:
+            period = 5
+            if hasattr(self, "map_period_combo"):
+                data = self.map_period_combo.currentData()
+                if data:
+                    period = int(data)
+
+            kl_list = self.chan[0]
+            seg_list = kl_list.seg_list
+            if len(seg_list) == 0:
+                QMessageBox.warning(self, "警告", "当前没有划分出线段，无法导出")
+                return
+
+            # 1) 收集线段端点（起点、终点交替）
+            raw_pts = []  # (cond, price)
+            for seg in seg_list:
+                raw_pts.append((
+                    self._tdx_poly_cond(seg.start_bi.get_begin_klu(), period),
+                    seg.start_bi.get_begin_val(),
+                ))
+                raw_pts.append((
+                    self._tdx_poly_cond(seg.end_bi.get_end_klu(), period),
+                    seg.end_bi.get_end_val(),
+                ))
+
+            # 2) 相邻同一根目标周期K线的点合并（线段可能被压缩到同一根K线内），保留靠后的点
+            vertices = []
+            for cond, price in raw_pts:
+                if vertices and vertices[-1][0] == cond:
+                    vertices[-1] = (cond, price)
+                else:
+                    vertices.append((cond, price))
+
+            # 3) 找出末尾连续的"未确定"线段，单独生成红色覆盖短线
+            tail_start = len(seg_list)
+            for i in range(len(seg_list) - 1, -1, -1):
+                if seg_list[i].is_sure:
+                    break
+                tail_start = i
+            tail_pts = []
+            if tail_start < len(seg_list):
+                tail_pts.append((
+                    self._tdx_poly_cond(seg_list[tail_start].start_bi.get_begin_klu(), period),
+                    seg_list[tail_start].start_bi.get_begin_val(),
+                ))
+                for seg in seg_list[tail_start:]:
+                    tail_pts.append((
+                        self._tdx_poly_cond(seg.end_bi.get_end_klu(), period),
+                        seg.end_bi.get_end_val(),
+                    ))
+                dedup = []
+                for cond, price in tail_pts:
+                    if dedup and dedup[-1][0] == cond:
+                        dedup[-1] = (cond, price)
+                    else:
+                        dedup.append((cond, price))
+                tail_pts = dedup
+
+            if len(vertices) > 600:
+                reply = QMessageBox.question(
+                    self,
+                    "顶点较多",
+                    (
+                        f"当前线段端点映射后有 {len(vertices)} 个顶点，对应的公式语句数量较多，\n"
+                        "通达信可能提示「语句数超过上限」。是否继续导出？\n\n"
+                        "（若报错，可缩短导入的历史数据范围后重试）"
+                    ),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if reply != QMessageBox.StandardButton.Yes:
+                    return
+
+            lines = []
+            lines.append("{缠论线段折线版 - 由 chan.py 自动生成}")
+            lines.append(
+                f"{{股票: {self.chan.code}  线段数: {len(seg_list)}  "
+                f"顶点数: {len(vertices)}  映射周期: {int(period)}分钟}}"
+            )
+            lines.append("{导入方法: 通达信 -> 功能 -> 公式系统 -> 公式管理器 -> 新建 -> 技术指标公式}")
+            lines.append(
+                f"{{重要: 本文件是 {int(period)} 分钟映射版本，"
+                f"请贴在 {int(period)} 分钟K线图上，不要贴在当前级别图上}}"
+            )
+            lines.append("{说明: 全部线段用一条 PLOYLINE 折线画出（黄色）；末尾的未确定线段用红色短线覆盖}")
+            lines.append("{说明: 通达信每条折线的最后一折会向后延伸成射线；本文件只有1~2条折线，最后顶点在最新K线上，故看不到射线}")
+            lines.append("{说明: 期货夜盘K线的日期用交易日标注，与通达信一致，无需改动}")
+            lines.append("")
+
+            def _emit_var_block(pts, prefix, out_lines):
+                """为一条折线生成变量语句，返回汇总变量名。"""
+                names = []
+                for i, (cond, price) in enumerate(pts, 1):
+                    name = f"{prefix}{i}"
+                    names.append(name)
+                    out_lines.append(f"{name}:=IF({self._tdx_poly_cond_str(cond)},{price:.2f},0);")
+                group_names = []
+                for gi in range(0, len(names), 25):
+                    gname = f"{prefix}G{len(group_names) + 1}"
+                    out_lines.append(f"{gname}:=" + "+".join(names[gi:gi + 25]) + ";")
+                    group_names.append(gname)
+                total_name = f"{prefix}TOTAL"
+                out_lines.append(f"{total_name}:=" + "+".join(group_names) + ";")
+                return total_name
+
+            yellow_total = _emit_var_block(vertices, "V", lines)
+            lines.append(f"PLOYLINE({yellow_total}>0,{yellow_total}),COLORYELLOW,LINETHICK1;")
+
+            if len(tail_pts) >= 2:
+                lines.append("")
+                lines.append("{===== 未确定线段（红色覆盖，末尾连续未确定段）=====}")
+                red_total = _emit_var_block(tail_pts, "W", lines)
+                lines.append(f"PLOYLINE({red_total}>0,{red_total}),COLORRED,LINETHICK1;")
+
+            content = "\n".join(lines) + "\n"
+
+            default_name = f"chan_seg_{self.chan.code}_{int(period)}m_polyline.tni"
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                f"保存通达信折线版公式({int(period)}分钟映射)",
+                default_name,
+                "通达信公式文件 (*.tni);;文本文件 (*.txt);;所有文件 (*.*)",
+            )
+            if not file_path:
+                return
+
+            with open(file_path, 'w', encoding='gbk', errors='ignore') as f:
+                f.write(content)
+
+            self.statusBar.showMessage(
+                f'已导出通达信折线版公式({int(period)}分钟映射): {file_path} '
+                f'({len(seg_list)}条线段/{len(vertices)}个顶点，请贴在{int(period)}分钟图上)'
+            )
+
+            reply = QMessageBox.question(
+                self,
+                "导出成功",
+                (
+                    f"已导出 {len(seg_list)} 条线段（{len(vertices)} 个顶点）到:\n{file_path}\n\n"
+                    f"这是 {int(period)} 分钟折线版，请把公式贴到 {int(period)} 分钟K线图上。\n"
+                    f"黄色=全部线段，红色=末尾未确定线段。\n\n"
+                    "是否立即打开该通达信公式文件？"
+                ),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                try:
+                    os.startfile(file_path)
+                except Exception as e:
+                    QMessageBox.warning(self, "打开失败", f"无法打开文件:\n{file_path}\n\n错误: {e}")
+        except Exception as e:
+            QMessageBox.critical(self, "导出错误", str(e))
 
     def _export_tdx_seg_formula_impl(self, map_period=None):
         """
