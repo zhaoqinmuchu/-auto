@@ -14,8 +14,10 @@ ChanScanner - 缠论图表分析工具 - Powered by chan.py
     - 日线级别: 使用 baostock 获取A股历史K线数据
     - 本地数据: 通达信导出的TXT文件
 
-笔划分规则:
-    - 固定使用新笔（bi_strict=False，非严格模式），不提供新旧笔切换
+笔划分规则（界面可切换）:
+    - 笔类型: 新笔（默认，bi_strict=False）/ 旧笔（严格，bi_strict=True）
+    - 分型校验: loss（默认，最贴原文第77课价格条款）/ half（原程序默认）/ strict
+    - 笔尾极值约束: 关闭（原文无此条款，开启会导致跳空/急跌后笔链停摆）
 
 依赖:
     - PyQt6: GUI框架
@@ -312,11 +314,33 @@ class AkshareGUI(QMainWindow):
         period_hint.setStyleSheet("color: #888888; font-size: 11px;")
         single_layout.addWidget(period_hint)
 
-        # 笔划分规则说明（固定新笔，已移除新旧笔切换）
-        rule_hint = QLabel("笔划分规则: 固定使用新笔(bi_strict=False)")
-        rule_hint.setWordWrap(True)
-        rule_hint.setStyleSheet("color: #666666; font-size: 11px;")
-        single_layout.addWidget(rule_hint)
+        # 笔类型选择（新笔/旧笔）
+        bi_type_row = QHBoxLayout()
+        bi_type_row.addWidget(QLabel("笔类型:"))
+        self.bi_type_combo = QComboBox()
+        self.bi_type_combo.addItem("新笔（默认）", "new")
+        self.bi_type_combo.addItem("旧笔（严格）", "old")
+        bi_type_row.addWidget(self.bi_type_combo)
+        single_layout.addLayout(bi_type_row)
+
+        # 分型校验方式选择（原文价格条款只有 loss 一档）
+        bi_fx_row = QHBoxLayout()
+        bi_fx_row.addWidget(QLabel("分型校验:"))
+        self.bi_fx_combo = QComboBox()
+        self.bi_fx_combo.addItem("loss（原文，默认）", "loss")
+        self.bi_fx_combo.addItem("half（原程序默认）", "half")
+        self.bi_fx_combo.addItem("strict（更严）", "strict")
+        bi_fx_row.addWidget(self.bi_fx_combo)
+        single_layout.addLayout(bi_fx_row)
+
+        # 笔划分规则说明（随下拉框动态更新）
+        self.rule_hint = QLabel("")
+        self.rule_hint.setWordWrap(True)
+        self.rule_hint.setStyleSheet("color: #666666; font-size: 11px;")
+        single_layout.addWidget(self.rule_hint)
+        self.bi_type_combo.currentIndexChanged.connect(self._update_rule_hint)
+        self.bi_fx_combo.currentIndexChanged.connect(self._update_rule_hint)
+        self._update_rule_hint()
 
         # 导入本地通达信TXT数据
         import_row = QHBoxLayout()
@@ -419,6 +443,28 @@ class AkshareGUI(QMainWindow):
 
         return panel
 
+    def _update_rule_hint(self):
+        """刷新"笔划分规则"说明文字，并提示需要重新分析"""
+        bi_type = self.bi_type_combo.currentData()
+        bi_fx = self.bi_fx_combo.currentData()
+        if bi_type == "old":
+            type_text = "旧笔（严格：分型不共用K线 + 顶底之间≥1根独立K线）"
+        else:
+            type_text = "新笔（分型不共用K线 + 顶底之间≥3根原始K线）"
+        fx_text_map = {
+            "loss": "loss（原文第77课：顶分型最高K线区间需部分高于底分型最低K线区间）",
+            "half": "half（额外要求顶/底分型相邻K线也拉开，比原文严）",
+            "strict": "strict（两分型两侧各3根K线全部纳入比较，最严）",
+        }
+        self.rule_hint.setText(
+            f"笔划分规则: {type_text}\n"
+            f"分型校验: {fx_text_map.get(bi_fx, bi_fx)}\n"
+            "笔尾极值约束: 关（原文无此条款）"
+        )
+        status_bar = getattr(self, "statusBar", None)
+        if status_bar is not None and hasattr(status_bar, "showMessage"):
+            status_bar.showMessage("笔划分参数已修改，请重新点击「分析」或「导入本地TXT数据」生效")
+
     def get_chan_config(self):
         """
         获取缠论分析配置
@@ -426,9 +472,11 @@ class AkshareGUI(QMainWindow):
         Returns:
             CChanConfig: 包含笔划分、买卖点类型等配置的对象
         """
+        bi_type = self.bi_type_combo.currentData() if hasattr(self, "bi_type_combo") else "new"
+        bi_fx = self.bi_fx_combo.currentData() if hasattr(self, "bi_fx_combo") else "loss"
         return CChanConfig({
-            "bi_strict": False,  # 固定新笔（非严格模式），不提供新旧笔切换
-            "bi_fx_check": "half",  # 分型有效性校验方式（half 更符合缠论原文，避免 strict 过度过滤）
+            "bi_strict": (bi_type == "old"),  # 笔类型: 新笔(False)/旧笔(True)，由界面下拉框决定
+            "bi_fx_check": bi_fx,  # 分型有效性校验: loss(默认,原文)/half(原程序默认)/strict
             # 笔尾极值约束（原文没有这条）：开启时若笔内出现过"无法成笔的分型极值"（如跳空/急跌造成的
             # 顶底过近极值），后续所有合格分型都会被判 False，笔链会永久停止推进（AUL9 2026-11-06 午休后即如此）。
             "bi_end_is_peak": False,
