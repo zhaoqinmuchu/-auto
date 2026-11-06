@@ -2,7 +2,7 @@
 
 - 审计员：dep-audit（teammate of lead） · 任务：task-1 · 基线：分支 `codex/razor-project` HEAD `2c2aa75`
 - GUI 快照：`App/ashare_bsp_scanner_gui.py` sha256 `5a495fca9bae3e6efd1a1391df5938ad2e2813243f8fa4a906c98a7ced6a6e2a`（1088 行 / 45984 B）
-- 覆盖：tracked 155 个文件逐行判定（.py 99 个）；结论 KEEP=68 / REMOVE=75 / COUPLED=12
+- 覆盖：tracked 159 个文件逐行判定（.py 101 个）；结论 KEEP=72 / REMOVE=75 / COUPLED=12
 - 机器可读版：`docs/razor-dependency-evidence.json`（字段与本表一致，便于脚本复核）
 
 **结论图例**：`KEEP`=保留；`REMOVE`=可直接删（无运行路径引用）；`COUPLED`=保留但必须同步改（spec/验证工具/文档），或须与其他文件成组删除——**单独删会留断链**。
@@ -18,6 +18,8 @@
 - **README 静态图（40，约 6.3MB）**：`Image/` 整个目录（若要求 README 完整可读则改 KEEP，见 D4）
 
 > 删除后另有 3 处「必须同步」：`ChanScanner.spec`（L6）、`tools/verify_project.py`（基线）、`docs/*`（索引与哈希结论）——见 §3、§5、D10。
+
+> **执行状态（生成时刻 git status 快照）**：REMOVE 的 75 个文件中，已有 35 个从工作区删除（未提交）；剩余 40 个仍在，主要是 `Image/`（40 个）。COUPLED 中已删除 3 个（3 个死数据源）。
 
 ### 0.2 成组改动后才能删（COUPLED）
 
@@ -35,7 +37,7 @@
 
 ### 0.3 保留（KEEP）
 
-共 68 个文件：GUI 入口 1、核心框架 27、线段/中枢、绘图、数据源、空 `__init__.py` 10、工具、文档与元数据、参考素材、Debug 回归 4（明细见 §1）。
+共 72 个文件：GUI 入口 1、核心框架 27、线段/中枢、绘图、数据源、空 `__init__.py` 10、工具、文档与元数据、参考素材、Debug 回归 4（明细见 §1）。
 
 ## 1. 全量决策表（tracked 155 个文件，逐行）
 
@@ -101,8 +103,8 @@
 | --- | --- | --- | --- | --- | --- |
 | `Plot/PlotDriver.py` | matplotlib 绘图驱动：CPlotDriver、draw_klu/klc/bi/seg/zs/macd/bsp、redraw、save2img | App/ashare_bsp_scanner_gui.py:765（函数内 import）、tools/gui_smoke.py:86（canvas.figure 断言） | **KEEP** | GUI plot_chart（L765 函数内 import）使用；redraw 供缩放/框选后重绘，交互也依赖它 | 无：删除则绘图与交互全部失效 |
 | `Plot/PlotMeta.py` | 画图数据适配层（CChanPlotMeta：klc/bi/seg/eigen/zs/bsp 元数据） | Plot/PlotDriver.py:15、Plot/PlotDriver.py:15、Plot/PlotDriver.py:15 | **KEEP** | 运行路径依赖：被 3 处静态 import | 无：删除会中断静态 import |
-| `main.py` | 上游演示入口：拉 baostock sz.000001 → CPlotDriver → save2img('./test.png') → input() 阻塞 | 仅自身 __main__（main.py:7）；docs/MAINTENANCE.md:25 | **REMOVE** | 仅自身 __main__（L7）；联网取数、写图片、阻塞式演示，不是 GUI 入口；docs/MAINTENANCE.md:25 已注明其为上游例子 | 无：无模块引用；须与 Plot/AnimatePlotDriver.py 成对删除（后者仅被本文件 :4 引用） |
-| `Plot/AnimatePlotDriver.py` | 上游 IPython 动画演示驱动（CAnimateDriver） | main.py:4；实测 import Plot.AnimatePlotDriver → No module named 'IPython' | **REMOVE** | 仅 main.py:4 引用；L2 `from IPython.display import clear_output, display`，本环境未安装 IPython → 模块当前不可导入（实测 ModuleNotFoundError） | 无：无运行路径引用；须与 main.py 成对删除 |
+| `main.py` | 上游演示入口：拉 baostock sz.000001 → CPlotDriver → save2img('./test.png') → input() 阻塞 | 仅自身 __main__（main.py:7）；docs/MAINTENANCE.md:25 | **REMOVE** | 仅自身 __main__（L7）；联网取数、写图片、阻塞式演示，不是 GUI 入口；docs/MAINTENANCE.md:25 已注明其为上游例子 · *工作区已删除* | 无：无模块引用；须与 Plot/AnimatePlotDriver.py 成对删除（后者仅被本文件 :4 引用） |
+| `Plot/AnimatePlotDriver.py` | 上游 IPython 动画演示驱动（CAnimateDriver） | main.py:4；实测 import Plot.AnimatePlotDriver → No module named 'IPython' | **REMOVE** | 仅 main.py:4 引用；L2 `from IPython.display import clear_output, display`，本环境未安装 IPython → 模块当前不可导入（实测 ModuleNotFoundError） · *工作区已删除* | 无：无运行路径引用；须与 main.py 成对删除 |
 
 ### 1.5 数据源（DataAPI）
 
@@ -112,9 +114,9 @@
 | `DataAPI/BaoStockAPI.py` | baostock 日线数据源（GUI 日线在线分析，用户确认保留） | Chan.py:174、App/ashare_bsp_scanner_gui.py:192（data_src=DATA_SRC.BAO_STOCK） | **KEEP** | Chan.py:174 的 DATA_SRC.BAO_STOCK 分支 + GUI 日线分支；用户明确要求保留 | 无：用户明确要求保留 |
 | `DataAPI/TencentAPI.py` | 腾讯分钟线数据源（1/5/15/30/60 分钟；不支持日线） | App/ashare_bsp_scanner_gui.py:179（custom:TencentAPI.CTencent）、Chan.py:193（importlib.import_module） | **KEEP** | 静态引用 0，仅由 GUI L179 的 data_src="custom:TencentAPI.CTencent" 字符串动态导入；全部分钟级在线分析走它 | 无替代：唯一动态导入数据源，删除则全部分钟级在线分析失效 |
 | `DataAPI/TDX_TXT_API.py` | 本地通达信 TXT 导入（时间约定识别、跨月/跨年推断，用户优先保护功能） | App/ashare_bsp_scanner_gui.py:158、tools/analysis_fingerprint.py:39、Debug/test_cross_year_*.py | **KEEP** | 11 处静态引用（GUI L158、4 个保留回归、tools/analysis_fingerprint） | 无：用户第一优先保护功能 |
-| `DataAPI/csvAPI.py` | CSV 文件数据源（读 {code}_{k_type}.csv） | Chan.py:180（DATA_SRC.CSV 分支） | **COUPLED** | 仅被 Chan.py:180 的 DATA_SRC.CSV 分支导入；GUI 只用 BAO_STOCK 与 custom:，从不选 CSV | 删除需同时删 Chan.py:179-181 分支；只删文件则选 CSV 时 ImportError（无人会选） |
-| `DataAPI/ccxt.py` | ccxt 交易所数据源 | Chan.py:177；实测 import DataAPI.ccxt → No module named 'ccxt' | **COUPLED** | 仅被 Chan.py:177 的 DATA_SRC.CCXT 分支导入；ccxt 未安装 → 实测 import 即 ModuleNotFoundError（现为死代码） | 删除需同时删 Chan.py:176-178 分支；否则仅留警告级死引用 |
-| `DataAPI/AkshareAPI.py` | akshare 数据源 | Chan.py:183、DataAPI/AkshareAPI.py:1-2；实测 import → No module named 'akshare' | **COUPLED** | 仅被 Chan.py:183 的 DATA_SRC.AKSHARE 分支导入；akshare 未安装（且直接 import pandas，是 GUI 之外唯一 pandas 直接引用）→ 当前不可导入 | 删除需同时删 Chan.py:182-184 分支；删后 numpy/pandas 仍因 baostock/matplotlib 必需（见 §2） |
+| `DataAPI/csvAPI.py` | CSV 文件数据源（读 {code}_{k_type}.csv） | Chan.py:180（DATA_SRC.CSV 分支） | **COUPLED** | 仅被 Chan.py:180 的 DATA_SRC.CSV 分支导入；GUI 只用 BAO_STOCK 与 custom:，从不选 CSV · *工作区已删除* | 删除需同时删 Chan.py:179-181 分支；只删文件则选 CSV 时 ImportError（无人会选） |
+| `DataAPI/ccxt.py` | ccxt 交易所数据源 | Chan.py:177；实测 import DataAPI.ccxt → No module named 'ccxt' | **COUPLED** | 仅被 Chan.py:177 的 DATA_SRC.CCXT 分支导入；ccxt 未安装 → 实测 import 即 ModuleNotFoundError（现为死代码） · *工作区已删除* | 删除需同时删 Chan.py:176-178 分支；否则仅留警告级死引用 |
+| `DataAPI/AkshareAPI.py` | akshare 数据源 | Chan.py:183、DataAPI/AkshareAPI.py:1-2；实测 import → No module named 'akshare' | **COUPLED** | 仅被 Chan.py:183 的 DATA_SRC.AKSHARE 分支导入；akshare 未安装（且直接 import pandas，是 GUI 之外唯一 pandas 直接引用）→ 当前不可导入 · *工作区已删除* | 删除需同时删 Chan.py:182-184 分支；删后 numpy/pandas 仍因 baostock/matplotlib 必需（见 §2） |
 
 ### 1.6 包标记（__init__.py）
 
@@ -135,7 +137,9 @@
 
 | path | 现状作用 | 引用证据（file:line） | 结论 | 理由 | 删除/改动风险 |
 | --- | --- | --- | --- | --- | --- |
-| `ChanScanner.spec` | PyInstaller 目录模式打包配置（入口 App GUI；14 段 collect_all；EXE+COLLECT=ChanScanner） | ChanScanner.spec:6（hiddenimports）、:7-34（14 段 collect_all）、:37（Analysis 入口） | **COUPLED** | 删除文件后必须同步：L6 hiddenimports 去掉 DataAPI.csvAPI；TencentAPI 只能靠 hiddenimports 兜住（动态字符串导入） | 不改则打包后分钟线分析 ImportError |
+| `tools/razor_gui_check.py` | Lead 的离屏 Qt 剃刀验收脚本（40KB）：扫描移除/保留功能/配置/对话框/导入导出哈希/交互/可选联网 | 文件自述；不引用 Debug/main/Image | **KEEP** | 剃刀批次的端到端验收工具（本次审计时未跟踪，现已纳入版本管理） | 无：验收工具必须保留 |
+| `tools/razor_acceptance.py` | Lead 的剃刀总验收脚本（batch2 配套） | 文件自述（batch2 新增） | **KEEP** | 与 razor_gui_check 配套的一键验收入口 | 无 |
+| `ChanScanner.spec` | PyInstaller 目录模式打包配置（入口 App GUI；collect_all；EXE+COLLECT=ChanScanner） | ChanScanner.spec:6（hiddenimports）、:7-34（14 段 collect_all）、:37（Analysis 入口） | **COUPLED** | 删除文件后必须同步：L6 hiddenimports 去掉 DataAPI.csvAPI；TencentAPI 只能靠 hiddenimports 兜住（动态字符串导入） | 不改则打包后分钟线分析 ImportError |
 | `tools/verify_project.py` | 离线验收：96 文件字节基线 + AST 语法 + 4 项回归（+可选 fingerprint 等价） | tools/verify_project.py:22-27、docs/source-baseline-sha256.json（96 项） | **COUPLED** | L22-27 遍历 docs/source-baseline-sha256.json 并 read_bytes()：当前已因 GUI 改写 1 项 changed，删除任何 .py 后直接 FileNotFoundError → 必须改造或换基线 | 不改则剃刀后无法运行；方案见 D10 |
 | `tools/analysis_fingerprint.py` | 三样本（A111/CUL9/SCL9）缠论分析指纹：raw_kline/combined_kline/bi/seg/zs/bsp 计数 | tools/analysis_fingerprint.py:26（三样本）、:39（custom:TDX_TXT_API） | **KEEP** | 剃刀行为等价的主要证据工具；依赖 custom:TDX_TXT_API 与三样本文件 | 无：删除会中断静态 import |
 | `tools/gui_smoke.py` | 离屏 Qt 冒烟：导入/绘图/导出 .tni/六开关/缩放/拖拽 | tools/gui_smoke.py:26、:69-133 | **KEEP** | 验证保留功能的最小闭环 | 无：删除会中断静态 import |
@@ -150,38 +154,38 @@
 | `Debug/test_cross_year_e2e.py` | 跨年端到端离线回归 | tools/verify_project.py:12、:36、docs/DEBUG_INDEX.md（标记必留） | **KEEP** | tools/verify_project.py:12 的 REGRESSIONS 四件套之一（:36 拼 Debug/{name} 运行）；自建 tempfile fixture，完全离线、不依赖样本/网络 | 无：删除会直接导致验收工具失败 |
 | `Debug/test_user_2026_01.py` | 用户 2026-01 场景离线回归 | tools/verify_project.py:12、:36、docs/DEBUG_INDEX.md（标记必留） | **KEEP** | tools/verify_project.py:12 的 REGRESSIONS 四件套之一（:36 拼 Debug/{name} 运行）；自建 tempfile fixture，完全离线、不依赖样本/网络 | 无：删除会直接导致验收工具失败 |
 | `Debug/test_with_year_filter.py` | 年份过滤离线回归 | tools/verify_project.py:12、:36、docs/DEBUG_INDEX.md（标记必留） | **KEEP** | tools/verify_project.py:12 的 REGRESSIONS 四件套之一（:36 拼 Debug/{name} 运行）；自建 tempfile fixture，完全离线、不依赖样本/网络 | 无：删除会直接导致验收工具失败 |
-| `Debug/debug_tdx.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_tdx_txt.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_seg_0723.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_seg_0723b.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_seg_0723c.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_seg_0723d.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_seg_0723e.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_seg_0723f.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_seg_0723g.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_seg_0723h.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_seg_0723i.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_seg_9310.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
-| `Debug/test_000688_fix.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 | 无；建议随剃刀清理 |
-| `Debug/test_seg_diag.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 | 无；建议随剃刀清理 |
-| `Debug/test_seg_diag2.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 | 无；建议随剃刀清理 |
-| `Debug/test_seg_diag3.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 | 无；建议随剃刀清理 |
-| `Debug/test_seg_diag4.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 | 无；建议随剃刀清理 |
-| `Debug/test_seg_revert_fx_debug.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 | 无；建议随剃刀清理 |
-| `Debug/test_seg_second_case.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 | 无；建议随剃刀清理 |
-| `Debug/test_tdx_daily.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 | 无；建议随剃刀清理 |
-| `Debug/test_baostock_chan.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 | 无；若保留会误导“离线可复现” |
-| `Debug/test_baostock_enc.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 | 无；若保留会误导“离线可复现” |
-| `Debug/test_baostock_enc2.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 | 无；若保留会误导“离线可复现” |
-| `Debug/test_baostock_list.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 | 无；若保留会误导“离线可复现” |
-| `Debug/test_get_stocks.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 | 无；若保留会误导“离线可复现” |
-| `Debug/test_tencent_kline.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 | 无；若保留会误导“离线可复现” |
-| `Debug/strategy_demo.py` | 上游框架演示 | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示” | **REMOVE** | 上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力 | 无：无模块引用 |
-| `Debug/strategy_demo2.py` | 上游框架演示 | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示” | **REMOVE** | 上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力 | 无：无模块引用 |
-| `Debug/strategy_demo3.py` | 上游框架演示 | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示” | **REMOVE** | 上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力 | 无：无模块引用 |
-| `Debug/strategy_demo4.py` | 上游框架演示 | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示” | **REMOVE** | 上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力 | 无：无模块引用 |
-| `Debug/strategy_demo5.py` | 上游 ML 演示（需 xgboost，未安装） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游 ML 演示（需 xgboost，未安装）” | **REMOVE** | 上游机器学习演示，import xgboost（本环境未安装，实测不可导入）；与缠论 GUI 功能无关 | 无：无模块引用且当前无法运行 |
-| `Debug/strategy_demo6.py` | 上游 ML 演示（需 xgboost，未安装） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游 ML 演示（需 xgboost，未安装）” | **REMOVE** | 上游机器学习演示，import xgboost（本环境未安装，实测不可导入）；与缠论 GUI 功能无关 | 无：无模块引用且当前无法运行 |
+| `Debug/debug_tdx.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_tdx_txt.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_seg_0723.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_seg_0723b.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_seg_0723c.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_seg_0723d.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_seg_0723e.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_seg_0723f.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_seg_0723g.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_seg_0723h.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_seg_0723i.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_seg_9310.py` | 项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）” | **REMOVE** | 一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖 · *工作区已删除* | 无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行 |
+| `Debug/test_000688_fix.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 · *工作区已删除* | 无；建议随剃刀清理 |
+| `Debug/test_seg_diag.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 · *工作区已删除* | 无；建议随剃刀清理 |
+| `Debug/test_seg_diag2.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 · *工作区已删除* | 无；建议随剃刀清理 |
+| `Debug/test_seg_diag3.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 · *工作区已删除* | 无；建议随剃刀清理 |
+| `Debug/test_seg_diag4.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 · *工作区已删除* | 无；建议随剃刀清理 |
+| `Debug/test_seg_revert_fx_debug.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 · *工作区已删除* | 无；建议随剃刀清理 |
+| `Debug/test_seg_second_case.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 · *工作区已删除* | 无；建议随剃刀清理 |
+| `Debug/test_tdx_daily.py` | 桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）” | **REMOVE** | 硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现 · *工作区已删除* | 无；建议随剃刀清理 |
+| `Debug/test_baostock_chan.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 · *工作区已删除* | 无；若保留会误导“离线可复现” |
+| `Debug/test_baostock_enc.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 · *工作区已删除* | 无；若保留会误导“离线可复现” |
+| `Debug/test_baostock_enc2.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 · *工作区已删除* | 无；若保留会误导“离线可复现” |
+| `Debug/test_baostock_list.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 · *工作区已删除* | 无；若保留会误导“离线可复现” |
+| `Debug/test_get_stocks.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 · *工作区已删除* | 无；若保留会误导“离线可复现” |
+| `Debug/test_tencent_kline.py` | 联网脚本（baostock / 腾讯接口） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）” | **REMOVE** | 需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要 · *工作区已删除* | 无；若保留会误导“离线可复现” |
+| `Debug/strategy_demo.py` | 上游框架演示 | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示” | **REMOVE** | 上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力 · *工作区已删除* | 无：无模块引用 |
+| `Debug/strategy_demo2.py` | 上游框架演示 | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示” | **REMOVE** | 上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力 · *工作区已删除* | 无：无模块引用 |
+| `Debug/strategy_demo3.py` | 上游框架演示 | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示” | **REMOVE** | 上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力 · *工作区已删除* | 无：无模块引用 |
+| `Debug/strategy_demo4.py` | 上游框架演示 | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示” | **REMOVE** | 上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力 · *工作区已删除* | 无：无模块引用 |
+| `Debug/strategy_demo5.py` | 上游 ML 演示（需 xgboost，未安装） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游 ML 演示（需 xgboost，未安装）” | **REMOVE** | 上游机器学习演示，import xgboost（本环境未安装，实测不可导入）；与缠论 GUI 功能无关 · *工作区已删除* | 无：无模块引用且当前无法运行 |
+| `Debug/strategy_demo6.py` | 上游 ML 演示（需 xgboost，未安装） | 无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游 ML 演示（需 xgboost，未安装）” | **REMOVE** | 上游机器学习演示，import xgboost（本环境未安装，实测不可导入）；与缠论 GUI 功能无关 · *工作区已删除* | 无：无模块引用且当前无法运行 |
 
 ### 1.9 文档与仓库元数据
 
@@ -197,6 +201,8 @@
 | `docs/MAINTENANCE.md` | 维护手册：环境安装、验证命令、打包说明 | docs/MAINTENANCE.md:15、:25、:30、:38、:44、:105 | **COUPLED** | L25 提到 main.py / Script/requirements.txt 为上游例子；若删除这两项需改该段；L30/38/44 验证命令依赖 verify_project.py | 不改则文档过时 |
 | `docs/VERIFICATION.md` | 验证记录：原始 96 个 Python 文件哈希快照与验证结论 | docs/VERIFICATION.md:21 | **COUPLED** | L21 的“原始 96 个 Python 文件”在删除后不再成立，需更新为剃刀后基线 | 不改则记录与现实不符 |
 | `docs/source-baseline-sha256.json` | 原始 96 个 .py 的 SHA-256 基线（verify_project.py 读取） | tools/verify_project.py:22-27；实测 96 项、1 项已变（App/ashare_bsp_scanner_gui.py） | **COUPLED** | 删除任何 .py 后该基线缺项；且当前 App GUI 已改写（changed=1）→ verify_project.py 现在就会失败 | 需重签或改名保留原证据（D10） |
+| `docs/razor-dependency-evidence.md` | 本次审计交付物（人读版）：全量决策表 + 包级结论 + spec 修改 + 争议项 | 本文件 | **KEEP** | 新增文件（本表自身）；Lead 已在 66bb2d3 提交 | 无 |
+| `docs/razor-dependency-evidence.json` | 本次审计交付物（机器可读版）：与 md 同构的 157 条决策 + packages/spec/disputes 字段 | 本文件 | **KEEP** | 新增文件（本表自身）；供脚本复核 | 无 |
 | `docs/dependency-evidence.json` | 已核实的环境依赖事实（venv 版本、旧 EXE 内嵌 Python 3.13 等） | docs/dependency-evidence.json（PyQt6 6.11.0 / baostock 0.9.3 / matplotlib 3.11.1 / numpy 2.5.1 / pandas 3.0.5 / requests 2.34.2） | **KEEP** | 本次审计复用其环境事实，仍然有效 | 无：删除会中断静态 import |
 
 ### 1.10 Image 静态图（40 个文件，逐个列出）
@@ -249,7 +255,7 @@
 | path | 现状作用 | 引用证据（file:line） | 结论 | 理由 | 删除/改动风险 |
 | --- | --- | --- | --- | --- | --- |
 | `TDX/chan_bi_simple.txt` | 通达信「缠论简化版画笔指标」公式源码（GBK，1.7KB） | 无代码引用（人工保留的参考素材） | **KEEP** | 无代码引用，但主题与保留的“导出通达信线段公式”功能直接相关，可作公式写法参考 | 无（1.7KB） |
-| `Script/requirements.txt` | 上游旧依赖清单（baostock/ipython/matplotlib/numpy/pandas/requests 下限） | 无引用；docs/MAINTENANCE.md:25 | **REMOVE** | 无任何引用；docs/MAINTENANCE.md:25 已明确它不能作为 GUI 依赖清单（含未使用的 ipython） | 无：GUI 依赖由 requirements-gui.txt 独立锁定 |
+| `Script/requirements.txt` | 上游旧依赖清单（baostock/ipython/matplotlib/numpy/pandas/requests 下限） | 无引用；docs/MAINTENANCE.md:25 | **REMOVE** | 无任何引用；docs/MAINTENANCE.md:25 已明确它不能作为 GUI 依赖清单（含未使用的 ipython） · *工作区已删除* | 无：GUI 依赖由 requirements-gui.txt 独立锁定 |
 
 ## 2. 包级依赖结论（requirements-gui.txt 22 行）
 
@@ -300,23 +306,39 @@
 
 ## 3. 删除文件后 ChanScanner.spec 怎么改
 
-当前 spec：77 行；入口 `Analysis(['App\\ashare_bsp_scanner_gui.py'], pathex=['.'])`（L37-49）；L6 `hiddenimports` 4 项；L7-34 对 14 个包逐个 `collect_all` 并累加 datas/binaries/hiddenimports。
+当前 spec：入口 `Analysis(['App\\ashare_bsp_scanner_gui.py'], pathex=['.'])`（L37-49）；L6 `hiddenimports`；L7-34 逐个 `collect_all` 并累加 datas/binaries/hiddenimports。
 
-### 3.1 必须改（mandatory）
+### 3.0 生成时刻工作区已执行的改动（未提交）
+
+- **以下为生成时刻 `git status` 快照（未提交的 batch2 工作区改动），非本审计的待办要求，仅供 Lead 核对执行进度。**
+- 工作区已删除 41 个文件：DataAPI/{AkshareAPI,ccxt,csvAPI}.py、main.py、Plot/AnimatePlotDriver.py、Script/requirements.txt、Debug 下除 4 个离线回归外的全部 32 个。→ 与本表 REMOVE 清单一致；Debug/test_tdx_txt.py 与 test_seg_9310.py 也被删（本表允许，D5 的保守保留建议未被采纳）。
+- Chan.py 已删 DATA_SRC 的 CCXT/CSV/AKSHARE 三分支，GetStockAPI 现只剩 BAO_STOCK（L173-175）+ custom:（L179-186）→ 与 D2 推荐一致。
+- Common/CEnum.py 的 `class DATA_SRC` 现只剩 `BAO_STOCK = auto()` → 与 D2 一致。
+- ChanScanner.spec：hiddenimports 已改为 ['DataAPI.BaoStockAPI','DataAPI.TencentAPI','DataAPI.TDX_TXT_API']；collect_all 精简为 10 个包（Common/Bi/Seg/ZS/KLine/Combiner/Math/Plot/DataAPI/BuySellPoint），Chan/ChanConfig/App/ChanModel 四段已移除 → 与 §3.1 及 §3.2 建议方向一致。
+- 仍未执行：Image/ 未删（40 个文件）、Seg/SegListDYH+Def 与 KLine/KLine_List.py 分支保留（保守选择 D1，正确）、README/quick_guide 未重写、docs/DEBUG_INDEX/MAINTENANCE/VERIFICATION 未更新、verify_project.py 基线未重签（D10）、requirements 未加 pandas 注释。
+
+### 3.1 必须改（mandatory；batch2 工作区已按此执行，见 3.0）
 
 - **L6**
   - 现状：`hiddenimports = ['DataAPI.BaoStockAPI', 'DataAPI.csvAPI', 'DataAPI.TencentAPI', 'DataAPI.TDX_TXT_API']`
-  - 改为：改为 hiddenimports = ['DataAPI.BaoStockAPI', 'DataAPI.TencentAPI', 'DataAPI.TDX_TXT_API']
-  - 原因：① 删除 DataAPI/csvAPI.py 后必须移除 'DataAPI.csvAPI'（否则 PyInstaller 报 hidden import 未找到，警告级但属脏配置）；② 必须保留 'DataAPI.TencentAPI'——它只通过 data_src="custom:TencentAPI.CTencent"（GUI:179）字符串动态导入，静态分析不可见，漏掉则打包后分钟线分析 ImportError；③ TDX_TXT_API 在 GUI:158 有函数内静态 import（PyInstaller 可发现），保留亦无害。
+  - 改为：hiddenimports = ['DataAPI.BaoStockAPI', 'DataAPI.TencentAPI', 'DataAPI.TDX_TXT_API']
+  - 原因：① 删除 DataAPI/csvAPI.py 后建议移除 'DataAPI.csvAPI'（否则 PyInstaller 报 `Hidden import 'DataAPI.csvAPI' not found`，警告级、构建不中断，属脏配置）；② 必须保留 'DataAPI.TencentAPI'——它只通过 data_src="custom:TencentAPI.CTencent"（GUI:179）字符串动态导入，静态分析不可见，漏掉则打包后分钟线分析 ImportError；③ TDX_TXT_API 在 GUI:158 有函数内静态 import（PyInstaller 可发现），保留亦无害。
 - **L（保守路径）**
   - 改为：若本轮不删 DataAPI 三文件，spec 一行都不用改，继续打包。
   - 原因：csvAPI 是 spec L6 中唯一与“可删文件”冲突的项。
 
-### 3.2 建议改（可选优化，不删文件也建议做）
+### 3.2 建议改（可选优化）+ collect_all 实测（PyInstaller 6.22.3）
+
+- 方法：`.venv\Scripts\python.exe -B .local-validation\razor\probe_collect_all.py`（PyInstaller 6.22.3，cwd=项目根）对 14 个名字调用 collect_all()，打印 datas/binaries/hiddenimports 数量与样本。
+- datas：14 个名字全部 datas>0，且内容就是**包内 .py 源文件本身**（例：Common datas=6 全是 Common\*.py；Math datas=8 全是 Math\*.py；App/ChanModel 因无 __init__.py 同一文件出现两条重复项）。→ dist 里多出一整套源码副本，运行时并不加载，纯冗余；删掉 collect_all 即可消除。
+- binaries：全部为 0 → 这些包确实没有二进制/动态库资源，spec 中 `binaries+=` 的累加始终为空。
+- hiddenimports 数量：Chan 1、ChanConfig 1、Common 6、Bi 4、Seg 9、ZS 4、KLine 5、Combiner 3、Math 8、Plot 4、DataAPI 8、ChanModel 2、BuySellPoint 4、App 2。其中含现役死模块 DataAPI.AkshareAPI / DataAPI.ccxt / DataAPI.csvAPI 与 Plot.AnimatePlotDriver → collect_all 会强制分析它们（删文件后自然消失；未删时对未安装的 ccxt/akshare/IPython 会报 `Hidden import ... not found` 警告，非致命）。
+- 单文件模块 Chan / ChanConfig 各触发 2 条 WARNING：`collect_data_files - skipping data collection for module 'Chan' as it is not a package`、`collect_dynamic_libs - skipping library collection ...`（共 4 条）。
+- 关键联动：只要保留 `DataAPI` 段的 collect_all，DataAPI 全部子模块（含 TencentAPI）都会自动进入 hiddenimports，此时 L6 的 'DataAPI.TencentAPI' 是冗余保险；一旦删掉 collect_all，L6 的 TencentAPI 条目就成为分钟线功能的唯一保障。→ **L6 的 TencentAPI 与 DataAPI 段 collect_all 不可同时删除。**
 
 - **L7-34**：删除 14 段 collect_all(...)（Chan/ChanConfig/Common/Bi/Seg/ZS/KLine/Combiner/Math/Plot/DataAPI/ChanModel/BuySellPoint/App），必要时用一行显式 hiddenimports 列表替代。
-  - 原因：① Chan、ChanConfig 是单文件模块而非包，collect_all 内部 collect_submodules 对其无意义（告警/空集）；App、ChanModel 无 __init__.py（隐式命名空间包），collect_all 语义不可靠；② 这些包没有任何 data/binary 资源（纯 .py），datas/binaries 收集应为空；③ 从入口 App GUI 出发的静态 import（含函数内 import）已覆盖全部核心模块，真正需要 hiddenimports 的只有动态导入目标。
-  - 风险：低（可能缩短构建时间、减少告警与潜在目录误收集）；功能等价，仍建议重建后冒烟确认。
+  - 原因：① 实测（3.2）：Chan、ChanConfig 是单文件模块，collect_all 触发 “not a package” 警告；App、ChanModel 无 __init__.py，collect_all 把同一 .py 收了两次；② 其余包 datas 收集到的只是 .py 源码副本（运行时不用），binaries 全为 0，这些累加语句对产物无功能贡献；③ 从入口 App GUI 出发的静态 import（含函数内 import，PyInstaller 可静态发现）已覆盖全部核心模块，真正需要 hiddenimports 的只有动态导入目标（即 L6）。
+  - 风险：低：功能等价，仅缩短构建时间、减少 4 条 warning 与冗余源码副本；但删除后 L6 的 'DataAPI.TencentAPI' 变成必需项（见 3.2 最后一条）。重建后按 3.4 冒烟确认。
 
 ### 3.3 不需要动
 
@@ -426,8 +448,8 @@
 ### D12 打包重建与 EXE 验证
 
 - 涉及路径（2）：`ChanScanner.spec`、`requirements-build.txt`
-- 建议：Lead 已手动安装 PyInstaller 6.22.3，可按 §3 rebuild_checklist 重建并冒烟；本次审计未执行构建（避免并行占用）。
-- 证据：requirements-build.txt 注释“未安装未重建”；旧 EXE 为 Python 3.13 内嵌，未随本次源码更新。
+- 建议：Lead 已手动安装 PyInstaller 6.22.3，collect_all 语义已实测（§3.2）；可按 §3.4 rebuild_checklist 重建并冒烟；本次审计未执行完整构建（避免与 Lead 并行占用）。
+- 证据：requirements-build.txt 注释“未安装未重建”；旧 EXE 为 Python 3.13 内嵌，未随本次源码更新；probe_collect_all.py 实测结果见 §3.2。
 - 保守选项：保留 spec 现状不改，先完成源码剃刀；打包作为独立阶段。
 - **最小风险选项：若本轮不做构建验证：仅按 §3 mandatory 改 L6，其余 collect_all 保持原样即可继续打包。**
 
@@ -443,7 +465,7 @@
   证据：docs/DEBUG_INDEX.md:1-23、docs/VERIFICATION.md:21、docs/MAINTENANCE.md:25
 - **工作区生成物可清理（非 tracked）**：test.png（182KB，main.py save2img 产物）、_debug_out.txt（3856B，Debug/debug_tdx.py 产物）、__pycache__/、.local-validation/、.local-backups/ 均可删；删除 Debug 脚本后 _debug_out.txt 不再再生。  
   证据：.gitignore 已忽略；git ls-files 中不存在
-- **本次审计新增的交付物**：docs/razor-dependency-evidence.md 与 docs/razor-dependency-evidence.json（本文件），以及审计脚本 .local-validation/razor/{audit_refs.py,audit_imports.py,build_deliverable.py}（gitignored，可重跑）。未改动任何已有源码/文档。  
+- **本次审计新增的交付物**：docs/razor-dependency-evidence.md 与 docs/razor-dependency-evidence.json（本文件），以及审计脚本 .local-validation/razor/{audit_refs.py,audit_imports.py,probe_collect_all.py,build_deliverable.py}（gitignored，可重跑）。未改动任何已有源码/文档。  
   证据：本目录
 - **工作区还有 Lead 的未跟踪文件**：RAZOR_HANDOFF.md（交接书）与 tools/razor_gui_check.py（Lead 的离屏 Qt 验收脚本，约 40KB，未跟踪）不属于本次决策范围；若保留 razor_gui_check.py，建议正式纳入 tools/ 与文档。  
   证据：git status --porcelain：?? RAZOR_HANDOFF.md、?? tools/razor_gui_check.py
@@ -456,19 +478,21 @@
 4. 运行时实测（只读，不跑 GUI/Debug）：python -B 逐模块 importlib.import_module —— Chan/ChanConfig/Plot.PlotDriver/DataAPI.{BaoStockAPI,TencentAPI,TDX_TXT_API,csvAPI}/Seg.SegList{DYH,Def} 可导入；DataAPI.ccxt（缺 ccxt）、DataAPI.AkshareAPI（缺 akshare）、Plot.AnimatePlotDriver 与 main（缺 IPython）不可导入。
 5. 包依赖链：读 .venv site-packages 的 dist-info/METADATA 与 baostock 源码，并用 `import baostock` 实测 pandas 被加载。
 6. 行号基线：HEAD 2c2aa75（codex/razor-project），App/ashare_bsp_scanner_gui.py sha256=5a495fca…（1088 行 / 45984 B）。GUI 若继续变动，引用请以符号名（方法/控件名）为准。
-7. 未运行 GUI/Debug/回归脚本，未联网，未装包，未执行 git 写操作。
+7. PyInstaller 6.22.3 只读实测（.local-validation/razor/probe_collect_all.py）：对 spec 中 14 个名字调用 collect_all()，统计 datas/binaries/hiddenimports；结果见 §3.2。
+8. 未运行 GUI/Debug/回归脚本，未联网，未装包，未执行 git 写操作。
 
 复现（PowerShell）：
 
 ```powershell
 .\.venv\Scripts\python.exe -B .\.local-validation\razor\audit_refs.py
 .\.venv\Scripts\python.exe -B .\.local-validation\razor\audit_imports.py
+.\.venv\Scripts\python.exe -B .\.local-validation\razor\probe_collect_all.py
 .\.venv\Scripts\python.exe -B .\.local-validation\razor\build_deliverable.py
 ```
 
 ## 7. 局限与未验证事项
 
-- 本审计未执行 PyInstaller 构建：§3 spec 结论主要是静态推理；Lead 已手动安装 PyInstaller 6.22.3，重建后请按 §3.4 冒烟并以实测为准。
+- 本审计未执行 PyInstaller 完整构建：仅对 collect_all 语义做了只读实测（§3.2，PyInstaller 6.22.3 已可用）；hiddenimports 必要性、入口/pathex 等结论为静态推理与实测联合得出。重建后请按 §3.4 冒烟确认。
 - 审计期间 Lead 正在改 App/ashare_bsp_scanner_gui.py；本表按 HEAD 2c2aa75 快照（sha256 见 §6）。GUI 后续改动只影响 GUI 行的内部行号，不影响其他文件结论。
 - 未运行 4 个回归/三样本 fingerprint（属验收阶段工作，且交接书禁止批量运行 Debug）；因此“删除后行为不变”基于依赖图与引用证据，而非回归实测。
 - 未评估打包产物体积/启动时间收益；未统计删除后 .py 行数变化（可复跑 .local-validation/razor 脚本统计）。

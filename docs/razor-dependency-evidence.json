@@ -3,7 +3,7 @@
     "title": "剃刀计划 · 依赖审计证据（决策表 + 包级结论 + spec 修改）",
     "auditor": "dep-audit (teammate of lead)",
     "task": "task-1",
-    "generated_at": "2026-11-06T14:08:22+08:00",
+    "generated_at": "2026-11-06T14:10:48+08:00",
     "baseline_snapshot": {
       "branch": "codex/razor-project",
       "head_commit": "2c2aa75",
@@ -12,18 +12,18 @@
       "gui_sha256": "5a495fca9bae3e6efd1a1391df5938ad2e2813243f8fa4a906c98a7ced6a6e2a",
       "gui_lines": 1088,
       "gui_bytes": 45984,
-      "tracked_files": 155,
-      "python_files": 99
+      "tracked_files": 159,
+      "python_files": 101
     },
     "coverage": {
-      "tracked_files_total": 155,
-      "tracked_files_covered": 155,
-      "python_files": 99,
+      "tracked_files_total": 159,
+      "tracked_files_covered": 159,
+      "python_files": 101,
       "duplicates": 0,
       "missing": 0
     },
     "counts": {
-      "KEEP": 68,
+      "KEEP": 72,
       "REMOVE": 75,
       "COUPLED": 12
     },
@@ -59,7 +59,7 @@
         "COUPLED": 0
       },
       "工具、打包与依赖清单": {
-        "KEEP": 4,
+        "KEEP": 6,
         "REMOVE": 0,
         "COUPLED": 2
       },
@@ -69,7 +69,7 @@
         "COUPLED": 0
       },
       "文档与仓库元数据": {
-        "KEEP": 6,
+        "KEEP": 8,
         "REMOVE": 0,
         "COUPLED": 5
       },
@@ -97,6 +97,7 @@
     "运行时实测（只读，不跑 GUI/Debug）：python -B 逐模块 importlib.import_module —— Chan/ChanConfig/Plot.PlotDriver/DataAPI.{BaoStockAPI,TencentAPI,TDX_TXT_API,csvAPI}/Seg.SegList{DYH,Def} 可导入；DataAPI.ccxt（缺 ccxt）、DataAPI.AkshareAPI（缺 akshare）、Plot.AnimatePlotDriver 与 main（缺 IPython）不可导入。",
     "包依赖链：读 .venv site-packages 的 dist-info/METADATA 与 baostock 源码，并用 `import baostock` 实测 pandas 被加载。",
     "行号基线：HEAD 2c2aa75（codex/razor-project），App/ashare_bsp_scanner_gui.py sha256=5a495fca…（1088 行 / 45984 B）。GUI 若继续变动，引用请以符号名（方法/控件名）为准。",
+    "PyInstaller 6.22.3 只读实测（.local-validation/razor/probe_collect_all.py）：对 spec 中 14 个名字调用 collect_all()，统计 datas/binaries/hiddenimports；结果见 §3.2。",
     "未运行 GUI/Debug/回归脚本，未联网，未装包，未执行 git 写操作。"
   ],
   "decisions": [
@@ -107,7 +108,8 @@
       "conclusion": "KEEP",
       "evidence": "ChanScanner.spec:37（Analysis 入口）、tools/gui_smoke.py:26、tools/razor_gui_check.py:1",
       "reason": "程序唯一入口；扫描与新旧笔切换已在本文件内移除（HEAD 2c2aa75）；随后所有保留功能都靠它",
-      "risk": "无：删除即无程序"
+      "risk": "无：删除即无程序",
+      "exists_in_workspace": true
     },
     {
       "path": "Chan.py",
@@ -116,7 +118,8 @@
       "conclusion": "KEEP",
       "evidence": "App/ashare_bsp_scanner_gui.py:62、Plot/AnimatePlotDriver.py:4、Plot/PlotDriver.py:9（共 30 处）",
       "reason": "全项目 30 处静态引用（GUI/Plot/Debug），核心不可替换",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "ChanConfig.py",
@@ -125,7 +128,8 @@
       "conclusion": "KEEP",
       "evidence": "App/ashare_bsp_scanner_gui.py:63、Chan.py:9、KLine/KLine_List.py:7（共 30 处）",
       "reason": "30 处静态引用；GUI:63 直接使用",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "Common/CEnum.py",
@@ -134,7 +138,8 @@
       "conclusion": "KEEP",
       "evidence": "App/ashare_bsp_scanner_gui.py:64、App/ashare_bsp_scanner_gui.py:64、App/ashare_bsp_scanner_gui.py:64（共 155 处）",
       "reason": "155 处静态引用，所有模块的公共词汇表",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "Common/CTime.py",
@@ -143,7 +148,8 @@
       "conclusion": "KEEP",
       "evidence": "Chan.py:12、DataAPI/AkshareAPI.py:5、DataAPI/BaoStockAPI.py:4（共 11 处）",
       "reason": "运行路径依赖：被 11 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "Common/ChanException.py",
@@ -152,7 +158,8 @@
       "conclusion": "KEEP",
       "evidence": "Bi/Bi.py:5、Bi/Bi.py:5、Bi/BiConfig.py:2（共 36 处）",
       "reason": "运行路径依赖：被 36 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "Common/func_util.py",
@@ -161,7 +168,8 @@
       "conclusion": "KEEP",
       "evidence": "BuySellPoint/BSPointConfig.py:4、BuySellPoint/BSPointList.py:6、Chan.py:13（共 18 处）",
       "reason": "运行路径依赖：被 18 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "Common/cache.py",
@@ -170,7 +178,8 @@
       "conclusion": "KEEP",
       "evidence": "Bi/Bi.py:3、Combiner/KLine_Combiner.py:3",
       "reason": "运行路径依赖：被 2 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "Bi/Bi.py",
@@ -179,7 +188,8 @@
       "conclusion": "KEEP",
       "evidence": "Bi/BiList.py:6、BuySellPoint/BSPointList.py:3、BuySellPoint/BS_Point.py:3（共 12 处）",
       "reason": "运行路径依赖：被 12 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "Bi/BiConfig.py",
@@ -188,7 +198,8 @@
       "conclusion": "KEEP",
       "evidence": "Bi/BiList.py:7、ChanConfig.py:3",
       "reason": "运行路径依赖：被 2 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "Bi/BiList.py",
@@ -197,7 +208,8 @@
       "conclusion": "KEEP",
       "evidence": "BuySellPoint/BSPointList.py:4、KLine/KLine_List.py:5、Seg/EigenFX.py:4（共 14 处）",
       "reason": "运行路径依赖：被 14 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "BuySellPoint/BS_Point.py",
@@ -206,7 +218,8 @@
       "conclusion": "KEEP",
       "evidence": "Bi/Bi.py:29、BuySellPoint/BSPointList.py:11、Chan.py:8（共 6 处）",
       "reason": "运行路径依赖：被 6 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "BuySellPoint/BSPointConfig.py",
@@ -215,7 +228,8 @@
       "conclusion": "KEEP",
       "evidence": "BuySellPoint/BSPointList.py:12、BuySellPoint/BSPointList.py:12、ChanConfig.py:4（共 4 处）",
       "reason": "运行路径依赖：被 4 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "BuySellPoint/BSPointList.py",
@@ -224,7 +238,8 @@
       "conclusion": "KEEP",
       "evidence": "KLine/KLine_List.py:6",
       "reason": "运行路径依赖：被 1 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "ChanModel/Features.py",
@@ -233,7 +248,8 @@
       "conclusion": "KEEP",
       "evidence": "BuySellPoint/BS_Point.py:4（共 3 处）",
       "reason": "被 BuySellPoint/BS_Point.py:4 静态 import；不是 ML 模块，不能按名字删",
-      "risk": "无：删除会使买卖点模块 ImportError"
+      "risk": "无：删除会使买卖点模块 ImportError",
+      "exists_in_workspace": true
     },
     {
       "path": "Combiner/Combine_Item.py",
@@ -242,7 +258,8 @@
       "conclusion": "KEEP",
       "evidence": "Combiner/KLine_Combiner.py:8",
       "reason": "运行路径依赖：被 1 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "Combiner/KLine_Combiner.py",
@@ -251,7 +268,8 @@
       "conclusion": "KEEP",
       "evidence": "KLine/KLine.py:1、Seg/Eigen.py:4",
       "reason": "运行路径依赖：被 2 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "KLine/KLine.py",
@@ -260,7 +278,8 @@
       "conclusion": "KEEP",
       "evidence": "Bi/Bi.py:6、Bi/BiList.py:4、KLine/KLine_List.py:15（共 8 处）",
       "reason": "运行路径依赖：被 8 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "KLine/KLine_List.py",
@@ -269,7 +288,8 @@
       "conclusion": "KEEP",
       "evidence": "Chan.py:15、Plot/PlotMeta.py:7",
       "reason": "Chan.py:15、Plot/PlotMeta.py:7；线段算法分派唯一入口（删分支见争议项 D1）",
-      "risk": "无（删除需同时处理 SegList 分支，见 D1）"
+      "risk": "无（删除需同时处理 SegList 分支，见 D1）",
+      "exists_in_workspace": true
     },
     {
       "path": "KLine/KLine_Unit.py",
@@ -278,7 +298,8 @@
       "conclusion": "KEEP",
       "evidence": "Bi/Bi.py:7、Chan.py:16、Combiner/Combine_Item.py:7（共 16 处）",
       "reason": "运行路径依赖：被 16 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "KLine/TradeInfo.py",
@@ -287,7 +308,8 @@
       "conclusion": "KEEP",
       "evidence": "KLine/KLine_Unit.py:14",
       "reason": "运行路径依赖：被 1 处静态 import",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "Math/BOLL.py",
@@ -296,7 +318,8 @@
       "conclusion": "KEEP",
       "evidence": "ChanConfig.py:8、KLine/KLine_Unit.py:7、KLine/KLine_Unit.py:7",
       "reason": "ChanConfig.py:91 无条件构造；删则模块导入即失败",
-      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑"
+      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑",
+      "exists_in_workspace": true
     },
     {
       "path": "Math/Demark.py",
@@ -305,7 +328,8 @@
       "conclusion": "KEEP",
       "evidence": "ChanConfig.py:9、KLine/KLine_Unit.py:8、KLine/KLine_Unit.py:8（共 5 处）",
       "reason": "即使 cal_demark=False，PlotDriver.py:13 也无条件 import，逻辑绘制必须存在",
-      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑"
+      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑",
+      "exists_in_workspace": true
     },
     {
       "path": "Math/KDJ.py",
@@ -314,7 +338,8 @@
       "conclusion": "KEEP",
       "evidence": "ChanConfig.py:10、KLine/KLine_Unit.py:9",
       "reason": "运行路径依赖：被 2 处静态 import",
-      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑"
+      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑",
+      "exists_in_workspace": true
     },
     {
       "path": "Math/MACD.py",
@@ -323,7 +348,8 @@
       "conclusion": "KEEP",
       "evidence": "ChanConfig.py:11、KLine/KLine_Unit.py:10、KLine/KLine_Unit.py:10",
       "reason": "运行路径依赖：被 3 处静态 import",
-      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑"
+      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑",
+      "exists_in_workspace": true
     },
     {
       "path": "Math/RSI.py",
@@ -332,7 +358,8 @@
       "conclusion": "KEEP",
       "evidence": "ChanConfig.py:12、KLine/KLine_Unit.py:11",
       "reason": "运行路径依赖：被 2 处静态 import",
-      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑"
+      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑",
+      "exists_in_workspace": true
     },
     {
       "path": "Math/TrendModel.py",
@@ -341,7 +368,8 @@
       "conclusion": "KEEP",
       "evidence": "ChanConfig.py:13、KLine/KLine_Unit.py:12",
       "reason": "运行路径依赖：被 2 处静态 import",
-      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑"
+      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑",
+      "exists_in_workspace": true
     },
     {
       "path": "Math/TrendLine.py",
@@ -350,7 +378,8 @@
       "conclusion": "KEEP",
       "evidence": "Seg/Seg.py:7",
       "reason": "运行路径依赖：被 1 处静态 import",
-      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑"
+      "risk": "无：删需改 ChanConfig/KLine_Unit/PlotDriver 的 import 与构造逻辑",
+      "exists_in_workspace": true
     },
     {
       "path": "Seg/Seg.py",
@@ -359,7 +388,8 @@
       "conclusion": "KEEP",
       "evidence": "Bi/Bi.py:26、BuySellPoint/BSPointList.py:7、BuySellPoint/BS_Point.py:6（共 9 处）",
       "reason": "运行路径依赖：被 9 处静态 import",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "Seg/SegConfig.py",
@@ -368,7 +398,8 @@
       "conclusion": "KEEP",
       "evidence": "ChanConfig.py:14、KLine/KLine_List.py:11、Seg/SegListChan.py:5（共 6 处）",
       "reason": "运行路径依赖：被 6 处静态 import",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "Seg/SegListChan.py",
@@ -377,7 +408,8 @@
       "conclusion": "KEEP",
       "evidence": "KLine/KLine_List.py:21",
       "reason": "运行路径依赖：被 1 处静态 import",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "Seg/SegListComm.py",
@@ -386,7 +418,8 @@
       "conclusion": "KEEP",
       "evidence": "BuySellPoint/BSPointList.py:8、KLine/KLine_List.py:12、Seg/SegListChan.py:6（共 6 处）",
       "reason": "运行路径依赖：被 6 处静态 import",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "Seg/Eigen.py",
@@ -395,7 +428,8 @@
       "conclusion": "KEEP",
       "evidence": "Plot/PlotMeta.py:8、Seg/EigenFX.py:9",
       "reason": "运行路径依赖：被 2 处静态 import",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "Seg/EigenFX.py",
@@ -404,7 +438,8 @@
       "conclusion": "KEEP",
       "evidence": "Plot/PlotMeta.py:9、Seg/Seg.py:9、Seg/SegListChan.py:4（共 6 处）",
       "reason": "运行路径依赖：被 6 处静态 import",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "ZS/ZS.py",
@@ -413,7 +448,8 @@
       "conclusion": "KEEP",
       "evidence": "BuySellPoint/BSPointList.py:9、Plot/PlotMeta.py:11、Seg/Seg.py:24（共 4 处）",
       "reason": "运行路径依赖：被 4 处静态 import",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "ZS/ZSConfig.py",
@@ -422,7 +458,8 @@
       "conclusion": "KEEP",
       "evidence": "ChanConfig.py:15、ZS/ZSList.py:8",
       "reason": "运行路径依赖：被 2 处静态 import",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "ZS/ZSList.py",
@@ -431,7 +468,8 @@
       "conclusion": "KEEP",
       "evidence": "KLine/KLine_List.py:13",
       "reason": "运行路径依赖：被 1 处静态 import",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "Seg/SegListDYH.py",
@@ -440,7 +478,8 @@
       "conclusion": "COUPLED",
       "evidence": "KLine/KLine_List.py:25（动态分支）、ChanConfig.py:32（默认 chan）",
       "reason": "仅当 seg_algo==\"1+1\" 时才被动态导入；GUI/4 回归/fingerprint 全部只用默认 \"chan\"（ChanConfig.py:32、SegConfig.py:6），产品内运行时不可达",
-      "risk": "删除需同时删 KLine/KLine_List.py:23-25 分支；只删文件则选到该配置时 ImportError"
+      "risk": "删除需同时删 KLine/KLine_List.py:23-25 分支；只删文件则选到该配置时 ImportError",
+      "exists_in_workspace": true
     },
     {
       "path": "Seg/SegListDef.py",
@@ -449,7 +488,8 @@
       "conclusion": "COUPLED",
       "evidence": "KLine/KLine_List.py:29（动态分支）、Seg/SegConfig.py:6（默认 chan）",
       "reason": "仅当 seg_algo==\"break\" 时才被动态导入；产品内同样不可达",
-      "risk": "删除需同时删 KLine/KLine_List.py:27-29 分支（同上）"
+      "risk": "删除需同时删 KLine/KLine_List.py:27-29 分支（同上）",
+      "exists_in_workspace": true
     },
     {
       "path": "Plot/PlotDriver.py",
@@ -458,7 +498,8 @@
       "conclusion": "KEEP",
       "evidence": "App/ashare_bsp_scanner_gui.py:765（函数内 import）、tools/gui_smoke.py:86（canvas.figure 断言）",
       "reason": "GUI plot_chart（L765 函数内 import）使用；redraw 供缩放/框选后重绘，交互也依赖它",
-      "risk": "无：删除则绘图与交互全部失效"
+      "risk": "无：删除则绘图与交互全部失效",
+      "exists_in_workspace": true
     },
     {
       "path": "Plot/PlotMeta.py",
@@ -467,7 +508,8 @@
       "conclusion": "KEEP",
       "evidence": "Plot/PlotDriver.py:15、Plot/PlotDriver.py:15、Plot/PlotDriver.py:15",
       "reason": "运行路径依赖：被 3 处静态 import",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "main.py",
@@ -476,7 +518,8 @@
       "conclusion": "REMOVE",
       "evidence": "仅自身 __main__（main.py:7）；docs/MAINTENANCE.md:25",
       "reason": "仅自身 __main__（L7）；联网取数、写图片、阻塞式演示，不是 GUI 入口；docs/MAINTENANCE.md:25 已注明其为上游例子",
-      "risk": "无：无模块引用；须与 Plot/AnimatePlotDriver.py 成对删除（后者仅被本文件 :4 引用）"
+      "risk": "无：无模块引用；须与 Plot/AnimatePlotDriver.py 成对删除（后者仅被本文件 :4 引用）",
+      "exists_in_workspace": false
     },
     {
       "path": "Plot/AnimatePlotDriver.py",
@@ -485,7 +528,8 @@
       "conclusion": "REMOVE",
       "evidence": "main.py:4；实测 import Plot.AnimatePlotDriver → No module named 'IPython'",
       "reason": "仅 main.py:4 引用；L2 `from IPython.display import clear_output, display`，本环境未安装 IPython → 模块当前不可导入（实测 ModuleNotFoundError）",
-      "risk": "无：无运行路径引用；须与 main.py 成对删除"
+      "risk": "无：无运行路径引用；须与 main.py 成对删除",
+      "exists_in_workspace": false
     },
     {
       "path": "DataAPI/CommonStockAPI.py",
@@ -494,7 +538,8 @@
       "conclusion": "KEEP",
       "evidence": "Chan.py:14、DataAPI/AkshareAPI.py:9、DataAPI/BaoStockAPI.py:8（共 7 处）",
       "reason": "运行路径依赖：被 7 处静态 import",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "DataAPI/BaoStockAPI.py",
@@ -503,7 +548,8 @@
       "conclusion": "KEEP",
       "evidence": "Chan.py:174、App/ashare_bsp_scanner_gui.py:192（data_src=DATA_SRC.BAO_STOCK）",
       "reason": "Chan.py:174 的 DATA_SRC.BAO_STOCK 分支 + GUI 日线分支；用户明确要求保留",
-      "risk": "无：用户明确要求保留"
+      "risk": "无：用户明确要求保留",
+      "exists_in_workspace": true
     },
     {
       "path": "DataAPI/TencentAPI.py",
@@ -512,7 +558,8 @@
       "conclusion": "KEEP",
       "evidence": "App/ashare_bsp_scanner_gui.py:179（custom:TencentAPI.CTencent）、Chan.py:193（importlib.import_module）",
       "reason": "静态引用 0，仅由 GUI L179 的 data_src=\"custom:TencentAPI.CTencent\" 字符串动态导入；全部分钟级在线分析走它",
-      "risk": "无替代：唯一动态导入数据源，删除则全部分钟级在线分析失效"
+      "risk": "无替代：唯一动态导入数据源，删除则全部分钟级在线分析失效",
+      "exists_in_workspace": true
     },
     {
       "path": "DataAPI/TDX_TXT_API.py",
@@ -521,7 +568,8 @@
       "conclusion": "KEEP",
       "evidence": "App/ashare_bsp_scanner_gui.py:158、tools/analysis_fingerprint.py:39、Debug/test_cross_year_*.py",
       "reason": "11 处静态引用（GUI L158、4 个保留回归、tools/analysis_fingerprint）",
-      "risk": "无：用户第一优先保护功能"
+      "risk": "无：用户第一优先保护功能",
+      "exists_in_workspace": true
     },
     {
       "path": "DataAPI/csvAPI.py",
@@ -530,7 +578,8 @@
       "conclusion": "COUPLED",
       "evidence": "Chan.py:180（DATA_SRC.CSV 分支）",
       "reason": "仅被 Chan.py:180 的 DATA_SRC.CSV 分支导入；GUI 只用 BAO_STOCK 与 custom:，从不选 CSV",
-      "risk": "删除需同时删 Chan.py:179-181 分支；只删文件则选 CSV 时 ImportError（无人会选）"
+      "risk": "删除需同时删 Chan.py:179-181 分支；只删文件则选 CSV 时 ImportError（无人会选）",
+      "exists_in_workspace": false
     },
     {
       "path": "DataAPI/ccxt.py",
@@ -539,7 +588,8 @@
       "conclusion": "COUPLED",
       "evidence": "Chan.py:177；实测 import DataAPI.ccxt → No module named 'ccxt'",
       "reason": "仅被 Chan.py:177 的 DATA_SRC.CCXT 分支导入；ccxt 未安装 → 实测 import 即 ModuleNotFoundError（现为死代码）",
-      "risk": "删除需同时删 Chan.py:176-178 分支；否则仅留警告级死引用"
+      "risk": "删除需同时删 Chan.py:176-178 分支；否则仅留警告级死引用",
+      "exists_in_workspace": false
     },
     {
       "path": "DataAPI/AkshareAPI.py",
@@ -548,7 +598,8 @@
       "conclusion": "COUPLED",
       "evidence": "Chan.py:183、DataAPI/AkshareAPI.py:1-2；实测 import → No module named 'akshare'",
       "reason": "仅被 Chan.py:183 的 DATA_SRC.AKSHARE 分支导入；akshare 未安装（且直接 import pandas，是 GUI 之外唯一 pandas 直接引用）→ 当前不可导入",
-      "risk": "删除需同时删 Chan.py:182-184 分支；删后 numpy/pandas 仍因 baostock/matplotlib 必需（见 §2）"
+      "risk": "删除需同时删 Chan.py:182-184 分支；删后 numpy/pandas 仍因 baostock/matplotlib 必需（见 §2）",
+      "exists_in_workspace": false
     },
     {
       "path": "BuySellPoint/__init__.py",
@@ -557,7 +608,8 @@
       "conclusion": "KEEP",
       "evidence": "所有 `from <pkg>.<mod> import` 语句（如 Chan.py:8-16）",
       "reason": "300+ 处点分导入（如 `from Common.CEnum import ...`）依赖这些目录被当作常规包；PyInstaller 亦然",
-      "risk": "低但无收益：0 字节文件，保留"
+      "risk": "低但无收益：0 字节文件，保留",
+      "exists_in_workspace": true
     },
     {
       "path": "Combiner/__init__.py",
@@ -566,7 +618,8 @@
       "conclusion": "KEEP",
       "evidence": "所有 `from <pkg>.<mod> import` 语句（如 Chan.py:8-16）",
       "reason": "300+ 处点分导入（如 `from Common.CEnum import ...`）依赖这些目录被当作常规包；PyInstaller 亦然",
-      "risk": "低但无收益：0 字节文件，保留"
+      "risk": "低但无收益：0 字节文件，保留",
+      "exists_in_workspace": true
     },
     {
       "path": "Common/__init__.py",
@@ -575,7 +628,8 @@
       "conclusion": "KEEP",
       "evidence": "所有 `from <pkg>.<mod> import` 语句（如 Chan.py:8-16）",
       "reason": "300+ 处点分导入（如 `from Common.CEnum import ...`）依赖这些目录被当作常规包；PyInstaller 亦然",
-      "risk": "低但无收益：0 字节文件，保留"
+      "risk": "低但无收益：0 字节文件，保留",
+      "exists_in_workspace": true
     },
     {
       "path": "DataAPI/__init__.py",
@@ -584,7 +638,8 @@
       "conclusion": "KEEP",
       "evidence": "所有 `from <pkg>.<mod> import` 语句（如 Chan.py:8-16）",
       "reason": "300+ 处点分导入（如 `from Common.CEnum import ...`）依赖这些目录被当作常规包；PyInstaller 亦然",
-      "risk": "低但无收益：0 字节文件，保留"
+      "risk": "低但无收益：0 字节文件，保留",
+      "exists_in_workspace": true
     },
     {
       "path": "KLine/__init__.py",
@@ -593,7 +648,8 @@
       "conclusion": "KEEP",
       "evidence": "所有 `from <pkg>.<mod> import` 语句（如 Chan.py:8-16）",
       "reason": "300+ 处点分导入（如 `from Common.CEnum import ...`）依赖这些目录被当作常规包；PyInstaller 亦然",
-      "risk": "低但无收益：0 字节文件，保留"
+      "risk": "低但无收益：0 字节文件，保留",
+      "exists_in_workspace": true
     },
     {
       "path": "Math/__init__.py",
@@ -602,7 +658,8 @@
       "conclusion": "KEEP",
       "evidence": "所有 `from <pkg>.<mod> import` 语句（如 Chan.py:8-16）",
       "reason": "300+ 处点分导入（如 `from Common.CEnum import ...`）依赖这些目录被当作常规包；PyInstaller 亦然",
-      "risk": "低但无收益：0 字节文件，保留"
+      "risk": "低但无收益：0 字节文件，保留",
+      "exists_in_workspace": true
     },
     {
       "path": "Plot/__init__.py",
@@ -611,7 +668,8 @@
       "conclusion": "KEEP",
       "evidence": "所有 `from <pkg>.<mod> import` 语句（如 Chan.py:8-16）",
       "reason": "300+ 处点分导入（如 `from Common.CEnum import ...`）依赖这些目录被当作常规包；PyInstaller 亦然",
-      "risk": "低但无收益：0 字节文件，保留"
+      "risk": "低但无收益：0 字节文件，保留",
+      "exists_in_workspace": true
     },
     {
       "path": "Seg/__init__.py",
@@ -620,7 +678,8 @@
       "conclusion": "KEEP",
       "evidence": "所有 `from <pkg>.<mod> import` 语句（如 Chan.py:8-16）",
       "reason": "300+ 处点分导入（如 `from Common.CEnum import ...`）依赖这些目录被当作常规包；PyInstaller 亦然",
-      "risk": "低但无收益：0 字节文件，保留"
+      "risk": "低但无收益：0 字节文件，保留",
+      "exists_in_workspace": true
     },
     {
       "path": "ZS/__init__.py",
@@ -629,7 +688,8 @@
       "conclusion": "KEEP",
       "evidence": "所有 `from <pkg>.<mod> import` 语句（如 Chan.py:8-16）",
       "reason": "300+ 处点分导入（如 `from Common.CEnum import ...`）依赖这些目录被当作常规包；PyInstaller 亦然",
-      "risk": "低但无收益：0 字节文件，保留"
+      "risk": "低但无收益：0 字节文件，保留",
+      "exists_in_workspace": true
     },
     {
       "path": "__init__.py",
@@ -638,16 +698,38 @@
       "conclusion": "KEEP",
       "evidence": "所有 `from <pkg>.<mod> import` 语句（如 Chan.py:8-16）",
       "reason": "300+ 处点分导入（如 `from Common.CEnum import ...`）依赖这些目录被当作常规包；PyInstaller 亦然",
-      "risk": "低但无收益：0 字节文件，保留"
+      "risk": "低但无收益：0 字节文件，保留",
+      "exists_in_workspace": true
+    },
+    {
+      "path": "tools/razor_gui_check.py",
+      "group": "工具、打包与依赖清单",
+      "role": "Lead 的离屏 Qt 剃刀验收脚本（40KB）：扫描移除/保留功能/配置/对话框/导入导出哈希/交互/可选联网",
+      "conclusion": "KEEP",
+      "evidence": "文件自述；不引用 Debug/main/Image",
+      "reason": "剃刀批次的端到端验收工具（本次审计时未跟踪，现已纳入版本管理）",
+      "risk": "无：验收工具必须保留",
+      "exists_in_workspace": true
+    },
+    {
+      "path": "tools/razor_acceptance.py",
+      "group": "工具、打包与依赖清单",
+      "role": "Lead 的剃刀总验收脚本（batch2 配套）",
+      "conclusion": "KEEP",
+      "evidence": "文件自述（batch2 新增）",
+      "reason": "与 razor_gui_check 配套的一键验收入口",
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "ChanScanner.spec",
       "group": "工具、打包与依赖清单",
-      "role": "PyInstaller 目录模式打包配置（入口 App GUI；14 段 collect_all；EXE+COLLECT=ChanScanner）",
+      "role": "PyInstaller 目录模式打包配置（入口 App GUI；collect_all；EXE+COLLECT=ChanScanner）",
       "conclusion": "COUPLED",
       "evidence": "ChanScanner.spec:6（hiddenimports）、:7-34（14 段 collect_all）、:37（Analysis 入口）",
       "reason": "删除文件后必须同步：L6 hiddenimports 去掉 DataAPI.csvAPI；TencentAPI 只能靠 hiddenimports 兜住（动态字符串导入）",
-      "risk": "不改则打包后分钟线分析 ImportError"
+      "risk": "不改则打包后分钟线分析 ImportError",
+      "exists_in_workspace": true
     },
     {
       "path": "tools/verify_project.py",
@@ -656,7 +738,8 @@
       "conclusion": "COUPLED",
       "evidence": "tools/verify_project.py:22-27、docs/source-baseline-sha256.json（96 项）",
       "reason": "L22-27 遍历 docs/source-baseline-sha256.json 并 read_bytes()：当前已因 GUI 改写 1 项 changed，删除任何 .py 后直接 FileNotFoundError → 必须改造或换基线",
-      "risk": "不改则剃刀后无法运行；方案见 D10"
+      "risk": "不改则剃刀后无法运行；方案见 D10",
+      "exists_in_workspace": true
     },
     {
       "path": "tools/analysis_fingerprint.py",
@@ -665,7 +748,8 @@
       "conclusion": "KEEP",
       "evidence": "tools/analysis_fingerprint.py:26（三样本）、:39（custom:TDX_TXT_API）",
       "reason": "剃刀行为等价的主要证据工具；依赖 custom:TDX_TXT_API 与三样本文件",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "tools/gui_smoke.py",
@@ -674,7 +758,8 @@
       "conclusion": "KEEP",
       "evidence": "tools/gui_smoke.py:26、:69-133",
       "reason": "验证保留功能的最小闭环",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "requirements-gui.txt",
@@ -683,7 +768,8 @@
       "conclusion": "KEEP",
       "evidence": "requirements-gui.txt 22 行 + §2 证据链",
       "reason": "6 个顶层依赖全部仍必需；pandas/numpy 由 baostock/matplotlib 传递强制（见 §2），一条都不能删",
-      "risk": "无：删任何一条都可能使离线安装不完整，且不减小打包体积"
+      "risk": "无：删任何一条都可能使离线安装不完整，且不减小打包体积",
+      "exists_in_workspace": true
     },
     {
       "path": "requirements-build.txt",
@@ -692,7 +778,8 @@
       "conclusion": "KEEP",
       "evidence": "requirements-build.txt:1-4",
       "reason": "重建 EXE 的唯一依据（Lead 已手动安装 PyInstaller 6.22.3）",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "Debug/test_cross_year_infer.py",
@@ -701,7 +788,8 @@
       "conclusion": "KEEP",
       "evidence": "tools/verify_project.py:12、:36、docs/DEBUG_INDEX.md（标记必留）",
       "reason": "tools/verify_project.py:12 的 REGRESSIONS 四件套之一（:36 拼 Debug/{name} 运行）；自建 tempfile fixture，完全离线、不依赖样本/网络",
-      "risk": "无：删除会直接导致验收工具失败"
+      "risk": "无：删除会直接导致验收工具失败",
+      "exists_in_workspace": true
     },
     {
       "path": "Debug/test_cross_year_e2e.py",
@@ -710,7 +798,8 @@
       "conclusion": "KEEP",
       "evidence": "tools/verify_project.py:12、:36、docs/DEBUG_INDEX.md（标记必留）",
       "reason": "tools/verify_project.py:12 的 REGRESSIONS 四件套之一（:36 拼 Debug/{name} 运行）；自建 tempfile fixture，完全离线、不依赖样本/网络",
-      "risk": "无：删除会直接导致验收工具失败"
+      "risk": "无：删除会直接导致验收工具失败",
+      "exists_in_workspace": true
     },
     {
       "path": "Debug/test_user_2026_01.py",
@@ -719,7 +808,8 @@
       "conclusion": "KEEP",
       "evidence": "tools/verify_project.py:12、:36、docs/DEBUG_INDEX.md（标记必留）",
       "reason": "tools/verify_project.py:12 的 REGRESSIONS 四件套之一（:36 拼 Debug/{name} 运行）；自建 tempfile fixture，完全离线、不依赖样本/网络",
-      "risk": "无：删除会直接导致验收工具失败"
+      "risk": "无：删除会直接导致验收工具失败",
+      "exists_in_workspace": true
     },
     {
       "path": "Debug/test_with_year_filter.py",
@@ -728,7 +818,8 @@
       "conclusion": "KEEP",
       "evidence": "tools/verify_project.py:12、:36、docs/DEBUG_INDEX.md（标记必留）",
       "reason": "tools/verify_project.py:12 的 REGRESSIONS 四件套之一（:36 拼 Debug/{name} 运行）；自建 tempfile fixture，完全离线、不依赖样本/网络",
-      "risk": "无：删除会直接导致验收工具失败"
+      "risk": "无：删除会直接导致验收工具失败",
+      "exists_in_workspace": true
     },
     {
       "path": "Debug/debug_tdx.py",
@@ -737,7 +828,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_tdx_txt.py",
@@ -746,7 +838,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_0723.py",
@@ -755,7 +848,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_0723b.py",
@@ -764,7 +858,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_0723c.py",
@@ -773,7 +868,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_0723d.py",
@@ -782,7 +878,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_0723e.py",
@@ -791,7 +888,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_0723f.py",
@@ -800,7 +898,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_0723g.py",
@@ -809,7 +908,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_0723h.py",
@@ -818,7 +918,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_0723i.py",
@@ -827,7 +928,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_9310.py",
@@ -836,7 +938,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“项目内样本一次性诊断（SCL9.txt / 写 _debug_out.txt）”",
       "reason": "一次性线段/日期诊断脚本，硬编码本项目样本 SCL9.txt 与特定区间；同类能力已由 4 个保留回归 + tools/analysis_fingerprint.py 覆盖",
-      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行"
+      "risk": "无模块引用；删除后 docs/DEBUG_INDEX.md 需同步删行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_000688_fix.py",
@@ -845,7 +948,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）”",
       "reason": "硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现",
-      "risk": "无；建议随剃刀清理"
+      "risk": "无；建议随剃刀清理",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_diag.py",
@@ -854,7 +958,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）”",
       "reason": "硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现",
-      "risk": "无；建议随剃刀清理"
+      "risk": "无；建议随剃刀清理",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_diag2.py",
@@ -863,7 +968,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）”",
       "reason": "硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现",
-      "risk": "无；建议随剃刀清理"
+      "risk": "无；建议随剃刀清理",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_diag3.py",
@@ -872,7 +978,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）”",
       "reason": "硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现",
-      "risk": "无；建议随剃刀清理"
+      "risk": "无；建议随剃刀清理",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_diag4.py",
@@ -881,7 +988,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）”",
       "reason": "硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现",
-      "risk": "无；建议随剃刀清理"
+      "risk": "无；建议随剃刀清理",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_revert_fx_debug.py",
@@ -890,7 +998,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）”",
       "reason": "硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现",
-      "risk": "无；建议随剃刀清理"
+      "risk": "无；建议随剃刀清理",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_seg_second_case.py",
@@ -899,7 +1008,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）”",
       "reason": "硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现",
-      "risk": "无；建议随剃刀清理"
+      "risk": "无；建议随剃刀清理",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_tdx_daily.py",
@@ -908,7 +1018,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“桌面硬编码路径（000688.txt / 999999.txt / 600570.txt，均不在仓库）”",
       "reason": "硬编码本机桌面文件路径（不在仓库），在新环境直接 FileNotFoundError；与用户本机数据强绑定、不可复现",
-      "risk": "无；建议随剃刀清理"
+      "risk": "无；建议随剃刀清理",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_baostock_chan.py",
@@ -917,7 +1028,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）”",
       "reason": "需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要",
-      "risk": "无；若保留会误导“离线可复现”"
+      "risk": "无；若保留会误导“离线可复现”",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_baostock_enc.py",
@@ -926,7 +1038,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）”",
       "reason": "需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要",
-      "risk": "无；若保留会误导“离线可复现”"
+      "risk": "无；若保留会误导“离线可复现”",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_baostock_enc2.py",
@@ -935,7 +1048,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）”",
       "reason": "需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要",
-      "risk": "无；若保留会误导“离线可复现”"
+      "risk": "无；若保留会误导“离线可复现”",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_baostock_list.py",
@@ -944,7 +1058,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）”",
       "reason": "需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要",
-      "risk": "无；若保留会误导“离线可复现”"
+      "risk": "无；若保留会误导“离线可复现”",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_get_stocks.py",
@@ -953,7 +1068,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）”",
       "reason": "需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要",
-      "risk": "无；若保留会误导“离线可复现”"
+      "risk": "无；若保留会误导“离线可复现”",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/test_tencent_kline.py",
@@ -962,7 +1078,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“联网脚本（baostock / 腾讯接口）”",
       "reason": "需要联网/外部接口；交接书明确禁止批量运行；离线回归不需要",
-      "risk": "无；若保留会误导“离线可复现”"
+      "risk": "无；若保留会误导“离线可复现”",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/strategy_demo.py",
@@ -971,7 +1088,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示”",
       "reason": "上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力",
-      "risk": "无：无模块引用"
+      "risk": "无：无模块引用",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/strategy_demo2.py",
@@ -980,7 +1098,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示”",
       "reason": "上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力",
-      "risk": "无：无模块引用"
+      "risk": "无：无模块引用",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/strategy_demo3.py",
@@ -989,7 +1108,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示”",
       "reason": "上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力",
-      "risk": "无：无模块引用"
+      "risk": "无：无模块引用",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/strategy_demo4.py",
@@ -998,7 +1118,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游框架演示”",
       "reason": "上游框架演示（多数据源/画图示例），与用户保留的单股分析功能无关；仅供演示内部能力",
-      "risk": "无：无模块引用"
+      "risk": "无：无模块引用",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/strategy_demo5.py",
@@ -1007,7 +1128,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游 ML 演示（需 xgboost，未安装）”",
       "reason": "上游机器学习演示，import xgboost（本环境未安装，实测不可导入）；与缠论 GUI 功能无关",
-      "risk": "无：无模块引用且当前无法运行"
+      "risk": "无：无模块引用且当前无法运行",
+      "exists_in_workspace": false
     },
     {
       "path": "Debug/strategy_demo6.py",
@@ -1016,7 +1138,8 @@
       "conclusion": "REMOVE",
       "evidence": "无静态引用（仅自身 __main__）；docs/DEBUG_INDEX.md 分类：“上游 ML 演示（需 xgboost，未安装）”",
       "reason": "上游机器学习演示，import xgboost（本环境未安装，实测不可导入）；与缠论 GUI 功能无关",
-      "risk": "无：无模块引用且当前无法运行"
+      "risk": "无：无模块引用且当前无法运行",
+      "exists_in_workspace": false
     },
     {
       "path": ".gitattributes",
@@ -1025,7 +1148,8 @@
       "conclusion": "KEEP",
       "evidence": "仓库根配置文件",
       "reason": "影响 checkout 行为与字节基线",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": ".gitignore",
@@ -1034,7 +1158,8 @@
       "conclusion": "KEEP",
       "evidence": "仓库根配置文件",
       "reason": "防止 A111/CUL9/SCL9/test.png/.local-* 入库",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "LICENSE",
@@ -1043,7 +1168,8 @@
       "conclusion": "KEEP",
       "evidence": "仓库根配置文件",
       "reason": "合规要求，随代码保留",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "README.md",
@@ -1052,7 +1178,8 @@
       "conclusion": "COUPLED",
       "evidence": "README.md 内 39 处 Image/ 引用；docs/MAINTENANCE.md:25 已注明上游文档属性",
       "reason": "纯文档、零运行依赖；但内容已与剃刀后功能不一致（仍描述已删的全市场扫描等），且引用 Image/ 全部插图",
-      "risk": "保留则文档过时；删除 Image/ 则 39 处图链失效 → 与 Image/ 成组处置（D4/D7）"
+      "risk": "保留则文档过时；删除 Image/ 则 39 处图链失效 → 与 Image/ 成组处置（D4/D7）",
+      "exists_in_workspace": true
     },
     {
       "path": "quick_guide.md",
@@ -1061,7 +1188,8 @@
       "conclusion": "KEEP",
       "evidence": "上游文档；PROJECT_GUIDE.md:24 说明上游文档属性",
       "reason": "纯文档；对个人使用价值低但无害，是否重写由 Lead 定（D7）",
-      "risk": "无（不影响运行与打包）"
+      "risk": "无（不影响运行与打包）",
+      "exists_in_workspace": true
     },
     {
       "path": "PROJECT_GUIDE.md",
@@ -1070,7 +1198,8 @@
       "conclusion": "KEEP",
       "evidence": "PROJECT_GUIDE.md:1-61",
       "reason": "Lead 维护的本地文档；剃刀后需小幅更新（入口未变）",
-      "risk": "无"
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "docs/DEBUG_INDEX.md",
@@ -1079,7 +1208,8 @@
       "conclusion": "COUPLED",
       "evidence": "docs/DEBUG_INDEX.md:1-23",
       "reason": "删除 32 个脚本后本表失效，必须同步缩减为 4 项",
-      "risk": "不改则文档与仓库不一致（不影响运行）"
+      "risk": "不改则文档与仓库不一致（不影响运行）",
+      "exists_in_workspace": true
     },
     {
       "path": "docs/MAINTENANCE.md",
@@ -1088,7 +1218,8 @@
       "conclusion": "COUPLED",
       "evidence": "docs/MAINTENANCE.md:15、:25、:30、:38、:44、:105",
       "reason": "L25 提到 main.py / Script/requirements.txt 为上游例子；若删除这两项需改该段；L30/38/44 验证命令依赖 verify_project.py",
-      "risk": "不改则文档过时"
+      "risk": "不改则文档过时",
+      "exists_in_workspace": true
     },
     {
       "path": "docs/VERIFICATION.md",
@@ -1097,7 +1228,8 @@
       "conclusion": "COUPLED",
       "evidence": "docs/VERIFICATION.md:21",
       "reason": "L21 的“原始 96 个 Python 文件”在删除后不再成立，需更新为剃刀后基线",
-      "risk": "不改则记录与现实不符"
+      "risk": "不改则记录与现实不符",
+      "exists_in_workspace": true
     },
     {
       "path": "docs/source-baseline-sha256.json",
@@ -1106,7 +1238,28 @@
       "conclusion": "COUPLED",
       "evidence": "tools/verify_project.py:22-27；实测 96 项、1 项已变（App/ashare_bsp_scanner_gui.py）",
       "reason": "删除任何 .py 后该基线缺项；且当前 App GUI 已改写（changed=1）→ verify_project.py 现在就会失败",
-      "risk": "需重签或改名保留原证据（D10）"
+      "risk": "需重签或改名保留原证据（D10）",
+      "exists_in_workspace": true
+    },
+    {
+      "path": "docs/razor-dependency-evidence.md",
+      "group": "文档与仓库元数据",
+      "role": "本次审计交付物（人读版）：全量决策表 + 包级结论 + spec 修改 + 争议项",
+      "conclusion": "KEEP",
+      "evidence": "本文件",
+      "reason": "新增文件（本表自身）；Lead 已在 66bb2d3 提交",
+      "risk": "无",
+      "exists_in_workspace": true
+    },
+    {
+      "path": "docs/razor-dependency-evidence.json",
+      "group": "文档与仓库元数据",
+      "role": "本次审计交付物（机器可读版）：与 md 同构的 157 条决策 + packages/spec/disputes 字段",
+      "conclusion": "KEEP",
+      "evidence": "本文件",
+      "reason": "新增文件（本表自身）；供脚本复核",
+      "risk": "无",
+      "exists_in_workspace": true
     },
     {
       "path": "docs/dependency-evidence.json",
@@ -1115,7 +1268,8 @@
       "conclusion": "KEEP",
       "evidence": "docs/dependency-evidence.json（PyQt6 6.11.0 / baostock 0.9.3 / matplotlib 3.11.1 / numpy 2.5.1 / pandas 3.0.5 / requests 2.34.2）",
       "reason": "本次审计复用其环境事实，仍然有效",
-      "risk": "无：删除会中断静态 import"
+      "risk": "无：删除会中断静态 import",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/answer_pic.png",
@@ -1124,7 +1278,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_1.svg",
@@ -1133,7 +1288,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_10.png",
@@ -1142,7 +1298,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_11.png",
@@ -1151,7 +1308,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_12.png",
@@ -1160,7 +1318,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_13.png",
@@ -1169,7 +1328,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_14.png",
@@ -1178,7 +1338,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_15.png",
@@ -1187,7 +1348,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_16.png",
@@ -1196,7 +1358,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_17.png",
@@ -1205,7 +1368,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_18.png",
@@ -1214,7 +1378,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_2.png",
@@ -1223,7 +1388,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_3.png",
@@ -1232,7 +1398,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_4.png",
@@ -1241,7 +1408,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_5.png",
@@ -1250,7 +1418,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_6.gif",
@@ -1259,7 +1428,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_7.png",
@@ -1268,7 +1438,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_8.png",
@@ -1277,7 +1448,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan.py_image_9.png",
@@ -1286,7 +1458,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan_coding_time.png",
@@ -1295,7 +1468,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan_commit_cnt.png",
@@ -1304,7 +1478,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan_gotify_info.png",
@@ -1313,7 +1488,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan_issue_cnt.png",
@@ -1322,7 +1498,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan_qujiantao.png",
@@ -1331,7 +1508,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/chan_trendline.png",
@@ -1340,7 +1518,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/coffee.jpeg",
@@ -1349,7 +1528,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/demark.png",
@@ -1358,7 +1538,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/feature_cnt.png",
@@ -1367,7 +1548,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/frame.png",
@@ -1376,7 +1558,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/futu_sim_snapshot.png",
@@ -1385,7 +1568,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/hk_sim_result.jpeg",
@@ -1394,7 +1578,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/marker.png",
@@ -1403,7 +1588,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/notion_table.png",
@@ -1412,7 +1598,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/open_send_msg.png",
@@ -1421,7 +1608,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/plot_cbsp.png",
@@ -1430,7 +1618,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/question_pic.png",
@@ -1439,7 +1628,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/repository.png",
@@ -1448,7 +1638,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/summary_b_us_test.png",
@@ -1457,7 +1648,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/us_sim_result.jpeg",
@@ -1466,7 +1658,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "Image/zs_algo.png",
@@ -1475,7 +1668,8 @@
       "conclusion": "REMOVE",
       "evidence": "`.py` 零引用；README.md 39 处引用；ChanScanner.spec 无 Image datas",
       "reason": "全项目 .py 零引用（grep 无 “Image/”），不参与运行、不进入 PyInstaller datas；仅 README.md 引用",
-      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）"
+      "risk": "仅 README 预览图失效（约 -6.3MB 仓库体积）；若要求 README 完整可读则改 KEEP（D4）",
+      "exists_in_workspace": true
     },
     {
       "path": "TDX/chan_bi_simple.txt",
@@ -1484,7 +1678,8 @@
       "conclusion": "KEEP",
       "evidence": "无代码引用（人工保留的参考素材）",
       "reason": "无代码引用，但主题与保留的“导出通达信线段公式”功能直接相关，可作公式写法参考",
-      "risk": "无（1.7KB）"
+      "risk": "无（1.7KB）",
+      "exists_in_workspace": true
     },
     {
       "path": "Script/requirements.txt",
@@ -1493,7 +1688,8 @@
       "conclusion": "REMOVE",
       "evidence": "无引用；docs/MAINTENANCE.md:25",
       "reason": "无任何引用；docs/MAINTENANCE.md:25 已明确它不能作为 GUI 依赖清单（含未使用的 ipython）",
-      "risk": "无：GUI 依赖由 requirements-gui.txt 独立锁定"
+      "risk": "无：GUI 依赖由 requirements-gui.txt 独立锁定",
+      "exists_in_workspace": false
     }
   ],
   "packages": {
@@ -1573,13 +1769,13 @@
   },
   "spec": {
     "file": "ChanScanner.spec",
-    "summary": "删除文件后必须同步 L6；L7-34 的 collect_all 为可选优化（建议删，非必需）。待用已安装的 PyInstaller 6.22.3 实测确认 collect_all 语义。",
+    "summary": "删除 DataAPI/csvAPI.py 后建议同步 L6（不改仅产生警告，不致命）；L7-34 的 collect_all 为可选优化（建议删，非必需）。已于 PyInstaller 6.22.3 下实测 collect_all 语义，见 3.2。",
     "mandatory": [
       {
         "lines": "6",
         "current": "hiddenimports = ['DataAPI.BaoStockAPI', 'DataAPI.csvAPI', 'DataAPI.TencentAPI', 'DataAPI.TDX_TXT_API']",
-        "edit": "改为 hiddenimports = ['DataAPI.BaoStockAPI', 'DataAPI.TencentAPI', 'DataAPI.TDX_TXT_API']",
-        "why": "① 删除 DataAPI/csvAPI.py 后必须移除 'DataAPI.csvAPI'（否则 PyInstaller 报 hidden import 未找到，警告级但属脏配置）；② 必须保留 'DataAPI.TencentAPI'——它只通过 data_src=\"custom:TencentAPI.CTencent\"（GUI:179）字符串动态导入，静态分析不可见，漏掉则打包后分钟线分析 ImportError；③ TDX_TXT_API 在 GUI:158 有函数内静态 import（PyInstaller 可发现），保留亦无害。"
+        "edit": "hiddenimports = ['DataAPI.BaoStockAPI', 'DataAPI.TencentAPI', 'DataAPI.TDX_TXT_API']",
+        "why": "① 删除 DataAPI/csvAPI.py 后建议移除 'DataAPI.csvAPI'（否则 PyInstaller 报 `Hidden import 'DataAPI.csvAPI' not found`，警告级、构建不中断，属脏配置）；② 必须保留 'DataAPI.TencentAPI'——它只通过 data_src=\"custom:TencentAPI.CTencent\"（GUI:179）字符串动态导入，静态分析不可见，漏掉则打包后分钟线分析 ImportError；③ TDX_TXT_API 在 GUI:158 有函数内静态 import（PyInstaller 可发现），保留亦无害。"
       },
       {
         "lines": "（保守路径）",
@@ -1587,12 +1783,20 @@
         "why": "csvAPI 是 spec L6 中唯一与“可删文件”冲突的项。"
       }
     ],
+    "measured": [
+      "方法：`.venv\\Scripts\\python.exe -B .local-validation\\razor\\probe_collect_all.py`（PyInstaller 6.22.3，cwd=项目根）对 14 个名字调用 collect_all()，打印 datas/binaries/hiddenimports 数量与样本。",
+      "datas：14 个名字全部 datas>0，且内容就是**包内 .py 源文件本身**（例：Common datas=6 全是 Common\\*.py；Math datas=8 全是 Math\\*.py；App/ChanModel 因无 __init__.py 同一文件出现两条重复项）。→ dist 里多出一整套源码副本，运行时并不加载，纯冗余；删掉 collect_all 即可消除。",
+      "binaries：全部为 0 → 这些包确实没有二进制/动态库资源，spec 中 `binaries+=` 的累加始终为空。",
+      "hiddenimports 数量：Chan 1、ChanConfig 1、Common 6、Bi 4、Seg 9、ZS 4、KLine 5、Combiner 3、Math 8、Plot 4、DataAPI 8、ChanModel 2、BuySellPoint 4、App 2。其中含现役死模块 DataAPI.AkshareAPI / DataAPI.ccxt / DataAPI.csvAPI 与 Plot.AnimatePlotDriver → collect_all 会强制分析它们（删文件后自然消失；未删时对未安装的 ccxt/akshare/IPython 会报 `Hidden import ... not found` 警告，非致命）。",
+      "单文件模块 Chan / ChanConfig 各触发 2 条 WARNING：`collect_data_files - skipping data collection for module 'Chan' as it is not a package`、`collect_dynamic_libs - skipping library collection ...`（共 4 条）。",
+      "关键联动：只要保留 `DataAPI` 段的 collect_all，DataAPI 全部子模块（含 TencentAPI）都会自动进入 hiddenimports，此时 L6 的 'DataAPI.TencentAPI' 是冗余保险；一旦删掉 collect_all，L6 的 TencentAPI 条目就成为分钟线功能的唯一保障。→ **L6 的 TencentAPI 与 DataAPI 段 collect_all 不可同时删除。**"
+    ],
     "optional": [
       {
         "lines": "7-34",
         "edit": "删除 14 段 collect_all(...)（Chan/ChanConfig/Common/Bi/Seg/ZS/KLine/Combiner/Math/Plot/DataAPI/ChanModel/BuySellPoint/App），必要时用一行显式 hiddenimports 列表替代。",
-        "why": "① Chan、ChanConfig 是单文件模块而非包，collect_all 内部 collect_submodules 对其无意义（告警/空集）；App、ChanModel 无 __init__.py（隐式命名空间包），collect_all 语义不可靠；② 这些包没有任何 data/binary 资源（纯 .py），datas/binaries 收集应为空；③ 从入口 App GUI 出发的静态 import（含函数内 import）已覆盖全部核心模块，真正需要 hiddenimports 的只有动态导入目标。",
-        "risk": "低（可能缩短构建时间、减少告警与潜在目录误收集）；功能等价，仍建议重建后冒烟确认。"
+        "why": "① 实测（3.2）：Chan、ChanConfig 是单文件模块，collect_all 触发 “not a package” 警告；App、ChanModel 无 __init__.py，collect_all 把同一 .py 收了两次；② 其余包 datas 收集到的只是 .py 源码副本（运行时不用），binaries 全为 0，这些累加语句对产物无功能贡献；③ 从入口 App GUI 出发的静态 import（含函数内 import，PyInstaller 可静态发现）已覆盖全部核心模块，真正需要 hiddenimports 的只有动态导入目标（即 L6）。",
+        "risk": "低：功能等价，仅缩短构建时间、减少 4 条 warning 与冗余源码副本；但删除后 L6 的 'DataAPI.TencentAPI' 变成必需项（见 3.2 最后一条）。重建后按 3.4 冒烟确认。"
       }
     ],
     "unchanged": [
@@ -1601,6 +1805,14 @@
       "EXE/COLLECT（目录模式、name='ChanScanner'、console=False、upx=True）",
       "excludes=[]",
       "datas=[] / binaries=[]（删除 Image/ 不影响，Image 从未进入 datas）"
+    ],
+    "observed_workspace": [
+      "**以下为生成时刻 `git status` 快照（未提交的 batch2 工作区改动），非本审计的待办要求，仅供 Lead 核对执行进度。**",
+      "工作区已删除 41 个文件：DataAPI/{AkshareAPI,ccxt,csvAPI}.py、main.py、Plot/AnimatePlotDriver.py、Script/requirements.txt、Debug 下除 4 个离线回归外的全部 32 个。→ 与本表 REMOVE 清单一致；Debug/test_tdx_txt.py 与 test_seg_9310.py 也被删（本表允许，D5 的保守保留建议未被采纳）。",
+      "Chan.py 已删 DATA_SRC 的 CCXT/CSV/AKSHARE 三分支，GetStockAPI 现只剩 BAO_STOCK（L173-175）+ custom:（L179-186）→ 与 D2 推荐一致。",
+      "Common/CEnum.py 的 `class DATA_SRC` 现只剩 `BAO_STOCK = auto()` → 与 D2 一致。",
+      "ChanScanner.spec：hiddenimports 已改为 ['DataAPI.BaoStockAPI','DataAPI.TencentAPI','DataAPI.TDX_TXT_API']；collect_all 精简为 10 个包（Common/Bi/Seg/ZS/KLine/Combiner/Math/Plot/DataAPI/BuySellPoint），Chan/ChanConfig/App/ChanModel 四段已移除 → 与 §3.1 及 §3.2 建议方向一致。",
+      "仍未执行：Image/ 未删（40 个文件）、Seg/SegListDYH+Def 与 KLine/KLine_List.py 分支保留（保守选择 D1，正确）、README/quick_guide 未重写、docs/DEBUG_INDEX|MAINTENANCE|VERIFICATION 未更新、verify_project.py 基线未重签（D10）、requirements 未加 pandas 注释。"
     ],
     "rebuild_checklist": [
       "1) .venv 安装 requirements-build.txt（PyInstaller 6.22.3 + hooks-contrib 2026.8）。",
@@ -1822,8 +2034,8 @@
         "ChanScanner.spec",
         "requirements-build.txt"
       ],
-      "recommendation": "Lead 已手动安装 PyInstaller 6.22.3，可按 §3 rebuild_checklist 重建并冒烟；本次审计未执行构建（避免并行占用）。",
-      "evidence": "requirements-build.txt 注释“未安装未重建”；旧 EXE 为 Python 3.13 内嵌，未随本次源码更新。",
+      "recommendation": "Lead 已手动安装 PyInstaller 6.22.3，collect_all 语义已实测（§3.2）；可按 §3.4 rebuild_checklist 重建并冒烟；本次审计未执行完整构建（避免与 Lead 并行占用）。",
+      "evidence": "requirements-build.txt 注释“未安装未重建”；旧 EXE 为 Python 3.13 内嵌，未随本次源码更新；probe_collect_all.py 实测结果见 §3.2。",
       "conservative": "保留 spec 现状不改，先完成源码剃刀；打包作为独立阶段。",
       "min_risk": "若本轮不做构建验证：仅按 §3 mandatory 改 L6，其余 collect_all 保持原样即可继续打包。"
     }
@@ -1856,7 +2068,7 @@
     },
     {
       "item": "本次审计新增的交付物",
-      "detail": "docs/razor-dependency-evidence.md 与 docs/razor-dependency-evidence.json（本文件），以及审计脚本 .local-validation/razor/{audit_refs.py,audit_imports.py,build_deliverable.py}（gitignored，可重跑）。未改动任何已有源码/文档。",
+      "detail": "docs/razor-dependency-evidence.md 与 docs/razor-dependency-evidence.json（本文件），以及审计脚本 .local-validation/razor/{audit_refs.py,audit_imports.py,probe_collect_all.py,build_deliverable.py}（gitignored，可重跑）。未改动任何已有源码/文档。",
       "evidence": "本目录"
     },
     {
@@ -1866,7 +2078,7 @@
     }
   ],
   "limitations": [
-    "本审计未执行 PyInstaller 构建：§3 spec 结论主要是静态推理；Lead 已手动安装 PyInstaller 6.22.3，重建后请按 §3.4 冒烟并以实测为准。",
+    "本审计未执行 PyInstaller 完整构建：仅对 collect_all 语义做了只读实测（§3.2，PyInstaller 6.22.3 已可用）；hiddenimports 必要性、入口/pathex 等结论为静态推理与实测联合得出。重建后请按 §3.4 冒烟确认。",
     "审计期间 Lead 正在改 App/ashare_bsp_scanner_gui.py；本表按 HEAD 2c2aa75 快照（sha256 见 §6）。GUI 后续改动只影响 GUI 行的内部行号，不影响其他文件结论。",
     "未运行 4 个回归/三样本 fingerprint（属验收阶段工作，且交接书禁止批量运行 Debug）；因此“删除后行为不变”基于依赖图与引用证据，而非回归实测。",
     "未评估打包产物体积/启动时间收益；未统计删除后 .py 行数变化（可复跑 .local-validation/razor 脚本统计）。",
